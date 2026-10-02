@@ -1,0 +1,13 @@
+[2026-10-02 14:38:31.657 INFO] (_export_backup) Exporting backup Backup(id=1, timestamp=1790916392, timestamp_ns_part=125530200, creator='player:Player0', comment='automatic-test', targets=['New World (4)'], tags={}, fileset_id_base=1, fileset_id_delta=2, file_count=50, file_raw_size_sum=954100, file_stored_size_sum=79755) to zipfile <local-path> World (4)\data\prime_backup\migrated-test.zip
+[2026-10-02 14:38:31.807 INFO] (run) Export done
+{
+  "result": "passed",
+  "source": "<local-path> World (4)",
+  "profile": "<local-path> World (4)",
+  "backup_id": 1,
+  "comment": "automatic-test",
+  "exported_entries": 51,
+  "source_database_sha256": "1f880b17ef07348b8cf32e8def238930ab33af90e4f2045dba334d90ce16d59a",
+  "verified_blob_export": true,
+  "source_preserved": true
+}

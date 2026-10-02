@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "singleplayer_bridge_gametest",
+  "version": "1.0.0",
+  "name": "Singleplayer Bridge Game Tests",
+  "environment": "client",
+  "license": "MIT",
+  "entrypoints": {
+    "fabric-client-gametest": ["io.github.mcdrsingleplayer.BridgeGameTest", "io.github.mcdrsingleplayer.PrimeBackupGameTest", "io.github.mcdrsingleplayer.AutoRuntimeGameTest"]
+  }
+}

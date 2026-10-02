@@ -1,0 +1,20 @@
+{
+  "shared": "<local-path>",
+  "mod_config": "<local-path>",
+  "profiles": [
+    {
+      "directory": "<local-path> World (4)",
+      "world": "<local-path> World (4)",
+      "storage_root": "<local-path> World (4)\\data\\prime_backup",
+      "database_exists": true
+    },
+    {
+      "directory": "<local-path> World (5)",
+      "world": "<local-path> World (5)",
+      "storage_root": "<local-path> World (5)\\data\\prime_backup",
+      "database_exists": true
+    }
+  ],
+  "legacy_config_exists": false,
+  "worlds_intermediate_exists": false
+}

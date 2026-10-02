@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "mcdr-singleplayer",
+  "version": "${version}",
+  "name": "mcdr-singleplayer",
+  "description": "Connect MCDReforged to the integrated server of a singleplayer world.",
+  "license": "LGPL-3.0-only",
+  "environment": "client",
+  "breaks": {"mcdr_singleplayer_bridge": "*"},
+  "mixins": ["mcdr_singleplayer_bridge.mixins.json"],
+  "entrypoints": {
+    "main": ["io.github.mcdrsingleplayer.SingleplayerBridge"]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "26.3",
+    "java": ">=25",
+    "fabric-api": ">=0.161.0"
+  }
+}

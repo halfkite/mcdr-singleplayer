@@ -1,0 +1,29 @@
+Initialized environment for MCDReforged in <local-path>
+MCDReforged 2.16.0 is starting up
+MCDReforged is open source, u can find it here: https://github.com/MCDReforged/MCDReforged
+[MCDR] [20:51:42] [MainThread/INFO]: Language is set to en_us
+[MCDR] [20:51:42] [MainThread/INFO]: Encoding / Decoding method has set to utf8 / utf8
+[MCDR] [20:51:42] [MainThread/INFO]: Server handler is set to vanilla_handler
+[MCDR] [20:51:42] [MainThread/INFO]: Plugin directory list:
+[MCDR] [20:51:42] [MainThread/INFO]: - plugins
+[MCDR] [20:51:42] [MainThread/INFO]: MCDReforged 2.16.0 is starting
+[MCDR] [20:51:42] [MainThread/INFO]: MCDReforged is running on Python 3.14.5 environment
+[MCDR] [20:51:42] [TaskExecutor/INFO]: Refreshing all plugins
+[MCDR] [20:51:42] [TaskExecutor/INFO]: Plugin full_path_probe@1.0.0 loaded
+[MCDR] [20:51:42] [TaskExecutor/INFO]: Plugin singleplayer_bridge@0.1.0 loaded
+[MCDR] [20:51:42] [TaskExecutor/INFO] [singleplayer_bridge]: 单人桥接已加载。MCDR 的 start/stop/kill 管理代理连接；不会关闭或重启游戏世界。
+[MCDR] [20:51:42] [TaskExecutor/INFO]: Using server handler singleplayer_bridge_handler provided by singleplayer_bridge@0.1.0
+[MCDR] [20:51:42] [TaskExecutor/INFO]: Loaded: [37m[2m2[0m plugins; Active plugin count: [37m[2m4[0m
+[MCDR] [20:51:42] [MainThread/INFO]: Starting the server with command ['<local-path>', '<local-path>', '--config', '<local-path>']
+[MCDR] [20:51:42] [MainThread/INFO]: Server is running at PID 25944
+[Server] Waiting for the singleplayer bridge (loopback only)...
+[Server] [20:51:42] [Bridge/INFO]: Minecraft 26.3 / <local-path> World (2)
+[Server] [20:51:42] [Bridge/INFO]: [Bridge] Singleplayer world ready
+[Server] [20:51:42] [Bridge/INFO]: Player0 joined the singleplayer world
+[Server] [20:51:43] [Bridge/INFO]: <Player0> !!fullbridge
+[Server] [20:51:43] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [20:51:43] [TaskExecutor/INFO]: Stopping the server and exiting MCDR
+[MCDR] [20:51:43] [MainThread/INFO]: Server process stopped with code 0
+[MCDR] [20:51:43] [MainThread/INFO]: Server stopped
+[MCDR] [20:51:43] [MainThread/INFO]: Stopping MCDR
+[MCDR] [20:51:43] [MainThread/INFO]: bye

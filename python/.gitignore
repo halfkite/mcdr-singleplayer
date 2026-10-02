@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+bridge_proxy.py
+bridge_supervisor.py
+bridge_bootstrap.py

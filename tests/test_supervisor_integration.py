@@ -1,0 +1,115 @@
+"""Two saves, real MCDR loader and stock PB, one shared config/plugins/permissions."""
+import hashlib
+import os
+import shutil
+import socket
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+from singleplayer_bridge.bootstrap import configure_common, pack
+from singleplayer_bridge.profiles import write_json, read_json
+from singleplayer_bridge.protocol import encode_frame, read_frame
+from singleplayer_bridge.supervisor import Controller
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def wait(predicate, timeout=20):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return
+        time.sleep(0.05)
+    raise AssertionError('Timeout')
+
+
+def test_controller_waits_switches_profiles_and_preserves_shared_files(tmp_path):
+    common = tmp_path / 'common'
+    common.mkdir()
+    (common / 'runtime/config').mkdir(parents=True)
+    subprocess.run([sys.executable, '-m', 'mcdreforged', 'init'], cwd=common / 'runtime/config', check=True, capture_output=True)
+    configure_common(common, Path(sys.executable), ROOT / 'python')
+    # Player joins register previously unknown names in MCDR's shared permission file.
+    from ruamel.yaml import YAML
+    yaml = YAML()
+    permission = yaml.load((common / 'runtime/config/permission.yml').read_text(encoding='utf8'))
+    permission['user'] = ['Steve']
+    with (common / 'runtime/config/permission.yml').open('w', encoding='utf8') as output:
+        yaml.dump(permission, output)
+    bridge_source = tmp_path / 'bridge-plugin'
+    shutil.copytree(ROOT / 'python/singleplayer_bridge', bridge_source / 'singleplayer_bridge', ignore=shutil.ignore_patterns('__pycache__'))
+    shutil.copy2(ROOT / 'python/mcdreforged.plugin.json', bridge_source / 'mcdreforged.plugin.json')
+    pack(bridge_source, common / 'runtime/config/plugins/singleplayer_bridge.mcdr')
+    pack(ROOT / 'prime-backup-adapter', common / 'runtime/config/plugins/singleplayer_prime_backup.mcdr')
+    shutil.copy2(ROOT / '.reference/PrimeBackup-v1.13.1.pyz', common / 'runtime/config/plugins/PrimeBackup.pyz')
+    (common / 'runtime/config/plugins/profile_probe.py').write_text('''from pathlib import Path
+import json
+PLUGIN_METADATA = {'id': 'profile_probe', 'version': '1.0.0'}
+def on_load(server, previous):
+    config = server.load_config_simple(default_config={'setting': 'initial'})
+    path = Path(server.get_data_folder()) / 'state.json'
+    state = json.loads(path.read_text()) if path.exists() else {'loads': 0}
+    state['loads'] += 1
+    path.write_text(json.dumps(state))
+    server.logger.info('PROFILE_PROBE_READY ' + str(state['loads']))
+''', encoding='utf8')
+    shared_before = {name: hashlib.sha256((common / 'runtime/config' / name).read_bytes()).hexdigest() for name in ('config.yml', 'permission.yml')}
+    listener = socket.socket()
+    listener.bind(('127.0.0.1', 0))
+    listener.listen()
+    listener.settimeout(20)
+    game_config = tmp_path / 'bridge.json'
+    write_json(game_config, dict(enabled=True, token='a' * 64, port=listener.getsockname()[1]))
+    controller = Controller(common, game_config, tmp_path / 'session.json', 'test', sys.executable)
+    connections = []
+    try:
+        controller.tick({})
+        assert controller.process is None
+        for index, name in enumerate(['世界 A', '世界 B', '世界 A']):
+            world = tmp_path / 'saves' / name
+            world.mkdir(parents=True, exist_ok=True)
+            (world / 'level.dat').write_bytes(b'test')
+            session = f'world-{index}'
+            state = dict(world_path=str(world), session=session)
+            controller.tick(state)
+            connection, _ = listener.accept()
+            connections.append(connection)
+            stream = connection.makefile('rb')
+            connection.settimeout(20)
+            assert read_frame(stream)['token'] == 'a' * 64
+            connection.sendall(encode_frame(dict(type='ready', protocol=1, session=session,
+                world_path=str(world), game_version='26.3', players=['Steve'], paused=False)))
+            profile = common / 'date' / name
+            wait(lambda: (profile / 'config/profile_probe/state.json').exists())
+            expected = 2 if index == 2 else 1
+            wait(lambda: read_json(profile / 'config/profile_probe/state.json')['loads'] == expected)
+            log = common / 'log' / profile.name / 'controller-child.log'
+            wait(lambda: 'singleplayer_prime_backup@0.3.5 loaded' in log.read_text(encoding='utf8'))
+            assert (common / 'log' / profile.name / 'MCDR.log').is_file()
+            assert 'Fail to load' not in log.read_text(encoding='utf8')
+            connection.sendall(encode_frame(dict(type='world_stopped', session=session)))
+            connection.close()
+            stream.close()
+            def stopped():
+                controller.tick({})
+                return controller.process is None
+            wait(stopped)
+        assert read_json(common / 'date/世界 B/config/profile_probe/state.json')['loads'] == 1
+        for name, digest in shared_before.items():
+            assert hashlib.sha256((common / 'runtime/config' / name).read_bytes()).hexdigest() == digest
+    finally:
+        for connection in connections:
+            connection.close()
+        listener.close()
+        if controller.process and controller.process.poll() is None:
+            controller.retire()
+            try:
+                controller.process.wait(15)
+            except subprocess.TimeoutExpired:
+                import psutil
+                for process in psutil.Process(controller.process.pid).children(recursive=True):
+                    process.kill()
+                controller.process.kill()
+                controller.process.wait()

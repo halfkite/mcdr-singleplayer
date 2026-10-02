@@ -1,0 +1,149 @@
+MCDReforged 2.16.0 is starting up
+MCDReforged is open source, u can find it here: https://github.com/MCDReforged/MCDReforged
+[MCDR] [23:32:50] [MainThread/INFO]: Language is set to en_us
+[MCDR] [23:32:50] [MainThread/INFO]: Encoding / Decoding method has set to utf8 / utf8
+[MCDR] [23:32:50] [MainThread/INFO]: Server handler is set to vanilla_handler
+[MCDR] [23:32:50] [MainThread/INFO]: Plugin directory list:
+[MCDR] [23:32:50] [MainThread/INFO]: - <local-path>
+[MCDR] [23:32:50] [MainThread/INFO]: MCDReforged 2.16.0 is starting
+[MCDR] [23:32:50] [MainThread/INFO]: MCDReforged is running on Python 3.14.5 environment
+[MCDR] [23:32:50] [TaskExecutor/INFO]: Refreshing all plugins
+[MCDR] [23:32:50] [TaskExecutor/INFO]: Plugin prime_backup@1.13.1 loaded
+[MCDR] [23:32:50] [TaskExecutor/INFO]: Plugin singleplayer_bridge@0.3.0 loaded
+[MCDR] [23:32:50] [TaskExecutor/INFO]: Plugin singleplayer_prime_backup@0.3.0 loaded
+[MCDR] [23:32:51] [TaskExecutor/INFO] [prime_backup]: Config file loaded
+[MCDR] [23:32:51] [TaskExecutor/WARNING] [prime_backup]: Prime Backup is disabled by config
+[MCDR] [23:32:51] [TaskExecutor/INFO] [singleplayer_bridge]: 单人桥接已加载。MCDR 的 start/stop/kill 管理代理连接；不会关闭或重启游戏世界。
+[MCDR] [23:32:51] [TaskExecutor/INFO] [singleplayer_prime_backup]: Config file loaded
+[MCDR] [23:32:51] [TaskExecutor/INFO] [singleplayer_prime_backup]: Prime Backup 1.13.1 singleplayer adapter ready (one bound world, confirmed saves and shutdown)
+[MCDR] [23:32:51] [TaskExecutor/INFO]: Using server handler singleplayer_bridge_handler provided by singleplayer_bridge@0.3.0
+[MCDR] [23:32:51] [TaskExecutor/INFO]: Loaded: [37m[2m3[0m plugins; Active plugin count: [37m[2m5[0m
+[MCDR] [23:32:51] [MainThread/INFO]: Starting the server with command ['<local-path>', '<local-path>', '--config-env']
+[MCDR] [23:32:51] [MainThread/INFO]: Server is running at PID 33152
+[Server] Waiting for the singleplayer bridge (loopback only)...
+[Server] [23:32:52] [Bridge/INFO]: Minecraft 26.3 / <local-path> World (4)
+[Server] [23:32:52] [Bridge/INFO]: [Bridge] Singleplayer world ready
+[Server] [23:32:52] [Bridge/INFO]: Player0 joined the singleplayer world
+[MCDR] [23:32:52] [TaskExecutor/INFO]: The permission level of player [96mPlayer0[0m has set to [93mowner[0m
+[MCDR] [23:32:52] [TaskExecutor/INFO]: 已启用当前存档的 Prime Backup 推荐配置。正在重新加载插件。
+[MCDR] [23:32:52] [TaskExecutor/INFO]: Reloading plugin prime_backup@1.13.1
+[MCDR] [23:32:52] [TaskExecutor/INFO]: Collected 1x extra plugins for reload due to dependency associations: singleplayer_prime_backup@0.3.0
+[MCDR] [23:32:52] [TaskExecutor/INFO]: Plugin singleplayer_prime_backup@0.3.0 unloaded
+[MCDR] [23:32:52] [TaskExecutor/INFO] [prime_backup]: Shutting down everything...
+[MCDR] [23:32:52] [TaskExecutor/INFO] [prime_backup]: Shutdown completes
+[MCDR] [23:32:52] [TaskExecutor/INFO]: Plugin prime_backup@1.13.1 unloaded
+[MCDR] [23:32:52] [TaskExecutor/INFO]: Plugin prime_backup@1.13.1 reloaded
+[MCDR] [23:32:52] [TaskExecutor/INFO]: Plugin singleplayer_prime_backup@0.3.0 reloaded
+[MCDR] [23:32:53] [TaskExecutor/INFO] [prime_backup]: Config file loaded
+[MCDR] [23:32:53] [PB@7b8b-init/INFO] [prime_backup]: Table db_meta does not exist, assuming newly created db, create everything
+[MCDR] [23:32:53] [PB@7b8b-worker-heavy/INFO] [prime_backup]: Worker heavy started
+[MCDR] [23:32:53] [PB@7b8b-worker-light/INFO] [prime_backup]: Worker light started
+[MCDR] [23:32:53] [PB@7b8b-crontab-scheduler/INFO] [prime_backup]: Scheduler started
+[MCDR] [23:32:53] [PB@7b8b-init/INFO] [prime_backup]: Added job "CreateDbBackupJob.run" to job store "default"
+[MCDR] [23:32:53] [PB@7b8b-init/INFO] [prime_backup]: Added job "PruneBackupJob.run" to job store "default"
+[MCDR] [23:32:53] [PB@7b8b-init/INFO] [prime_backup]: Added job "VacuumSqliteJob.run" to job store "default"
+[MCDR] [23:32:53] [PB@7b8b-init/INFO] [prime_backup]: Added job "CompactPackJob.run" to job store "default"
+[MCDR] [23:32:53] [TaskExecutor/INFO] [singleplayer_prime_backup]: Config file loaded
+[MCDR] [23:32:53] [TaskExecutor/INFO] [singleplayer_prime_backup]: Prime Backup 1.13.1 singleplayer adapter ready (one bound world, confirmed saves and shutdown)
+[Server] [23:32:53] [Bridge/INFO]: <Player0> !!pb make automatic-test
+[MCDR] [23:32:53] [PB@7b8b-worker-heavy/INFO] [prime_backup]: [36m[PB][0m Creating backup, please wait
+[Server] [23:32:53] [Bridge/INFO]: Command completed (result 1)
+[Server] [23:32:53] [Bridge/INFO]: Automatic saving is now disabled
+[Server] [23:32:53] [Bridge/INFO]: Saved the game
+[MCDR] [23:32:53] [PB@7b8b-worker-heavy/INFO] [prime_backup]: Scanning file for backup creation at path '<local-path>', targets: ['New World (4)']
+[MCDR] [23:32:53] [PB@7b8b-worker-heavy/INFO] [prime_backup]: Creating backup for ['New World (4)'] at path '<local-path>', file count 50 size 931.73KiB, timestamp 1790868773, creator 'player:Player0', comment 'automatic-test', tags {}
+[MCDR] [23:32:53] [PB@7b8b-worker-heavy/INFO] [prime_backup]: Create backup #1 done, added 22 blobs, 0 chunks and 0 packs (size 79.38KiB / 931.07KiB)
+[MCDR] [23:32:53] [PB@7b8b-worker-heavy/INFO] [prime_backup]: Time costs: save wait 0.04s, create backup 0.28s
+[MCDR] [23:32:53] [PB@7b8b-worker-heavy/INFO] [prime_backup]: [36m[PB][0m Backup completed, ID [33m#1[0m, cost [93m0.32s[0m, total [92m931.73KiB[0m (+[92m79.38KiB[0m)
+[Server] [23:32:53] [Bridge/INFO]: Command completed (result 1)
+[Server] [23:32:53] [Bridge/INFO]: Automatic saving is now enabled
+[Server] [23:32:53] [Bridge/INFO]: <Player0> !!pb back 1 --confirm
+[MCDR] [23:32:53] [PB@7b8b-worker-heavy/INFO] [prime_backup]: [36m[PB][0m Gonna restore the world to backup [33m#1[0m: automatic-test
+[MCDR] [23:32:53] [PB@7b8b-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m10 second later, the world will [91mbe restored[0m to backup [33m#1[0m: automatic-test
+[Server] [23:32:53] [Bridge/INFO]: Command completed (result 1)
+[Server] [23:32:53] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [23:32:54] [PB@7b8b-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m9 second later, the world will [91mbe restored[0m to backup [33m#1[0m: automatic-test
+[Server] [23:32:54] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [23:32:55] [PB@7b8b-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m8 second later, the world will [91mbe restored[0m to backup [33m#1[0m: automatic-test
+[Server] [23:32:55] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [23:32:56] [PB@7b8b-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m7 second later, the world will [91mbe restored[0m to backup [33m#1[0m: automatic-test
+[Server] [23:32:56] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [23:32:57] [PB@7b8b-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m6 second later, the world will [91mbe restored[0m to backup [33m#1[0m: automatic-test
+[Server] [23:32:57] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [23:32:58] [PB@7b8b-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m5 second later, the world will [91mbe restored[0m to backup [33m#1[0m: automatic-test
+[Server] [23:32:58] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [23:33:00] [PB@7b8b-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m4 second later, the world will [91mbe restored[0m to backup [33m#1[0m: automatic-test
+[Server] [23:33:00] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [23:33:01] [PB@7b8b-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m3 second later, the world will [91mbe restored[0m to backup [33m#1[0m: automatic-test
+[Server] [23:33:01] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [23:33:02] [PB@7b8b-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m2 second later, the world will [91mbe restored[0m to backup [33m#1[0m: automatic-test
+[Server] [23:33:02] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [23:33:03] [PB@7b8b-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m1 second later, the world will [91mbe restored[0m to backup [33m#1[0m: automatic-test
+[Server] [23:33:03] [Bridge/INFO]: Command completed (result 1)
+[Server] [23:33:04] [Bridge/INFO]: Saving and closing the singleplayer world
+[Server] [23:33:04] [Bridge/INFO]: Player0 left the singleplayer world
+[MCDR] [23:33:04] [PB@7b8b-worker-heavy/INFO] [prime_backup]: Wait for server to stop
+[Server] [23:33:04] [Bridge/INFO]: Player0 left the game
+[Server] [23:33:04] [Bridge/INFO]: [Bridge] World closed; control session ended
+[MCDR] [23:33:04] [MainThread/INFO]: Server process stopped with code 0
+[MCDR] [23:33:04] [MainThread/INFO]: Server stopped
+[MCDR] [23:33:04] [PB@7b8b-worker-heavy/INFO] [prime_backup]: Creating backup of existing files to avoid idiot
+[MCDR] [23:33:04] [PB@7b8b-worker-heavy/INFO] [prime_backup]: Scanning file for backup creation at path '<local-path>', targets: ['New World (4)']
+[MCDR] [23:33:04] [PB@7b8b-worker-heavy/INFO] [prime_backup]: Creating backup for ['New World (4)'] at path '<local-path>', file count 51 size 5.39MiB, timestamp 1790868784, creator 'prime_backup:pre_restore', comment '__pb_translated__:pre_restore:1', tags {'temporary': True}
+[MCDR] [23:33:04] [PB@7b8b-worker-heavy/INFO] [prime_backup]: Create backup #2 done, added 9 blobs, 0 chunks and 0 packs (size 172.15KiB / 5.38MiB)
+[MCDR] [23:33:04] [PB@7b8b-worker-heavy/INFO] [prime_backup]: Restoring to backup #1 (fail_soft=False, verify_blob=True)
+[MCDR] [23:33:04] [PB@7b8b-worker-heavy/INFO] [prime_backup]: Exporting Backup(id=1, timestamp=1790868773, timestamp_ns_part=565007100, creator='player:Player0', comment='automatic-test', targets=['New World (4)'], tags={}, fileset_id_base=1, fileset_id_delta=2, file_count=50, file_raw_size_sum=954088, file_stored_size_sum=81989) to directory <local-path>
+[MCDR] [23:33:05] [PB@7b8b-worker-heavy/INFO] [prime_backup]: Export done
+[MCDR] [23:33:05] [PB@7b8b-worker-heavy/INFO] [prime_backup]: Restore to backup #1 done, cost 0.33s (backup 0.24s, restore 0.08s), starting the server
+[MCDR] [23:33:05] [PB@7b8b-worker-heavy/INFO] [prime_backup]: 单人存档回档完成。请在 Minecraft 中重新进入原世界，MCDR 将自动连接对应存档配置。
+[MCDR] [23:33:05] [MainThread/INFO]: Stopping MCDR
+[MCDR] [23:33:05] [TaskExecutor/INFO] [prime_backup]: Shutting down everything...
+[MCDR] [23:33:05] [PB@7b8b-shutdown/INFO] [prime_backup]: Scheduler has been shut down
+[MCDR] [23:33:05] [PB@7b8b-worker-heavy/INFO] [prime_backup]: Worker heavy stopped
+[MCDR] [23:33:05] [PB@7b8b-worker-light/INFO] [prime_backup]: Worker light stopped
+[MCDR] [23:33:05] [TaskExecutor/INFO] [prime_backup]: Shutdown completes
+[MCDR] [23:33:05] [MainThread/INFO]: bye
+MCDReforged 2.16.0 is starting up
+MCDReforged is open source, u can find it here: https://github.com/MCDReforged/MCDReforged
+[MCDR] [23:33:07] [MainThread/INFO]: Language is set to en_us
+[MCDR] [23:33:07] [MainThread/INFO]: Encoding / Decoding method has set to utf8 / utf8
+[MCDR] [23:33:07] [MainThread/INFO]: Server handler is set to vanilla_handler
+[MCDR] [23:33:07] [MainThread/INFO]: Plugin directory list:
+[MCDR] [23:33:07] [MainThread/INFO]: - <local-path>
+[MCDR] [23:33:07] [MainThread/INFO]: MCDReforged 2.16.0 is starting
+[MCDR] [23:33:07] [MainThread/INFO]: MCDReforged is running on Python 3.14.5 environment
+[MCDR] [23:33:07] [TaskExecutor/INFO]: Refreshing all plugins
+[MCDR] [23:33:07] [TaskExecutor/INFO]: Plugin prime_backup@1.13.1 loaded
+[MCDR] [23:33:07] [TaskExecutor/INFO]: Plugin singleplayer_bridge@0.3.0 loaded
+[MCDR] [23:33:07] [TaskExecutor/INFO]: Plugin singleplayer_prime_backup@0.3.0 loaded
+[MCDR] [23:33:08] [TaskExecutor/INFO] [prime_backup]: Config file loaded
+[MCDR] [23:33:08] [PB@4a45-worker-heavy/INFO] [prime_backup]: Worker heavy started
+[MCDR] [23:33:08] [PB@4a45-worker-light/INFO] [prime_backup]: Worker light started
+[MCDR] [23:33:08] [PB@4a45-crontab-scheduler/INFO] [prime_backup]: Scheduler started
+[MCDR] [23:33:08] [PB@4a45-init/INFO] [prime_backup]: Added job "CreateDbBackupJob.run" to job store "default"
+[MCDR] [23:33:08] [PB@4a45-init/INFO] [prime_backup]: Added job "PruneBackupJob.run" to job store "default"
+[MCDR] [23:33:08] [PB@4a45-init/INFO] [prime_backup]: Added job "VacuumSqliteJob.run" to job store "default"
+[MCDR] [23:33:08] [PB@4a45-init/INFO] [prime_backup]: Added job "CompactPackJob.run" to job store "default"
+[MCDR] [23:33:08] [TaskExecutor/INFO] [singleplayer_bridge]: 单人桥接已加载。MCDR 的 start/stop/kill 管理代理连接；不会关闭或重启游戏世界。
+[MCDR] [23:33:08] [TaskExecutor/INFO] [singleplayer_prime_backup]: Config file loaded
+[MCDR] [23:33:08] [TaskExecutor/INFO] [singleplayer_prime_backup]: Prime Backup 1.13.1 singleplayer adapter ready (one bound world, confirmed saves and shutdown)
+[MCDR] [23:33:08] [TaskExecutor/INFO]: Using server handler singleplayer_bridge_handler provided by singleplayer_bridge@0.3.0
+[MCDR] [23:33:08] [TaskExecutor/INFO]: Loaded: [37m[2m3[0m plugins; Active plugin count: [37m[2m5[0m
+[MCDR] [23:33:08] [MainThread/INFO]: Starting the server with command ['<local-path>', '<local-path>', '--config-env']
+[MCDR] [23:33:08] [MainThread/INFO]: Server is running at PID 31244
+[Server] Waiting for the singleplayer bridge (loopback only)...
+[Server] [23:33:08] [Bridge/INFO]: Minecraft 26.3 / <local-path> World (4)
+[Server] [23:33:08] [Bridge/INFO]: [Bridge] Singleplayer world ready
+[Server] [23:33:08] [Bridge/INFO]: Player0 joined the singleplayer world
+[Server] [23:33:09] [Bridge/INFO]: Player0 left the singleplayer world
+[Server] [23:33:09] [Bridge/INFO]: Player0 left the game
+[Server] [23:33:09] [Bridge/INFO]: [Bridge] World closed; control session ended
+[MCDR] [23:33:09] [MainThread/INFO]: Server process stopped with code 0
+[MCDR] [23:33:09] [MainThread/INFO]: Server stopped
+[MCDR] [23:33:10] [MainThread/INFO]: Stopping MCDR
+[MCDR] [23:33:10] [TaskExecutor/INFO] [prime_backup]: Shutting down everything...
+[MCDR] [23:33:10] [PB@4a45-shutdown/INFO] [prime_backup]: Scheduler has been shut down
+[MCDR] [23:33:10] [PB@4a45-worker-heavy/INFO] [prime_backup]: Worker heavy stopped
+[MCDR] [23:33:10] [PB@4a45-worker-light/INFO] [prime_backup]: Worker light stopped
+[MCDR] [23:33:10] [TaskExecutor/INFO] [prime_backup]: Shutdown completes
+[MCDR] [23:33:10] [MainThread/INFO]: bye

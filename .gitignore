@@ -1,0 +1,14 @@
+.reference/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+build/
+dist/
+mod-builds/
+.gradle/
+*.log
+!docs/assets/*.log
+bridge.local.json
+fabric-bridge/run/
+mcdr-local/

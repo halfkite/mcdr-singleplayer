@@ -1,0 +1,266 @@
+MCDReforged 2.16.0 is starting up
+MCDReforged is open source, u can find it here: https://github.com/MCDReforged/MCDReforged
+[MCDR] [11:45:53] [MainThread/INFO]: 语言已设置为 zh_cn
+[MCDR] [11:45:53] [MainThread/INFO]: 编码 / 解码方式已设置为 utf8 / utf8
+[MCDR] [11:45:53] [MainThread/INFO]: 解析处理器已设置为 vanilla_handler
+[MCDR] [11:45:53] [MainThread/INFO]: 插件文件夹列表:
+[MCDR] [11:45:53] [MainThread/INFO]: - <local-path>
+[MCDR] [11:45:53] [MainThread/INFO]: MCDReforged 2.16.0 正在启动
+[MCDR] [11:45:53] [MainThread/INFO]: MCDReforged 正于 Python 3.14.5 环境中运行
+[MCDR] [11:45:53] [TaskExecutor/INFO]: 刷新所有插件中
+[MCDR] [11:45:53] [TaskExecutor/INFO]: 插件 prime_backup@1.13.1 已加载
+[MCDR] [11:45:53] [TaskExecutor/INFO]: 插件 singleplayer_bridge@0.3.2 已加载
+[MCDR] [11:45:53] [TaskExecutor/INFO]: 插件 singleplayer_prime_backup@0.3.2 已加载
+[MCDR] [11:45:53] [TaskExecutor/INFO]: 插件 test_command_probe@1.0.0 已加载
+[MCDR] [11:45:54] [TaskExecutor/INFO] [prime_backup]: 配置文件已加载
+[MCDR] [11:45:54] [PB@f00b-init/INFO] [prime_backup]: Table db_meta does not exist, assuming newly created db, create everything
+[MCDR] [11:45:54] [PB@f00b-worker-heavy/INFO] [prime_backup]: Worker heavy started
+[MCDR] [11:45:54] [PB@f00b-worker-light/INFO] [prime_backup]: Worker light started
+[MCDR] [11:45:54] [PB@f00b-crontab-scheduler/INFO] [prime_backup]: Scheduler started
+[MCDR] [11:45:54] [PB@f00b-init/INFO] [prime_backup]: Added job "CreateDbBackupJob.run" to job store "default"
+[MCDR] [11:45:54] [PB@f00b-init/INFO] [prime_backup]: Added job "VacuumSqliteJob.run" to job store "default"
+[MCDR] [11:45:54] [PB@f00b-init/INFO] [prime_backup]: Added job "CompactPackJob.run" to job store "default"
+[MCDR] [11:45:54] [TaskExecutor/INFO] [singleplayer_bridge]: 单人桥接已加载。MCDR 的 start/stop/kill 管理代理连接；不会关闭或重启游戏世界。
+[MCDR] [11:45:54] [TaskExecutor/INFO] [singleplayer_prime_backup]: 配置文件已加载
+[MCDR] [11:45:54] [TaskExecutor/INFO] [singleplayer_prime_backup]: Prime Backup 1.13.1 singleplayer adapter ready (one bound world, confirmed saves and shutdown)
+[MCDR] [11:45:54] [TaskExecutor/INFO]: 使用插件 singleplayer_bridge@0.3.2 提供的解析处理器 singleplayer_bridge_handler
+[MCDR] [11:45:54] [TaskExecutor/INFO]: 共加载: [37m[2m4[0m 个插件; 已加载插件数: [37m[2m6[0m
+[MCDR] [11:45:54] [MainThread/INFO]: 正在启动服务端，启动参数为 ['<local-path>', '<local-path>', '--config-env']
+[MCDR] [11:45:54] [MainThread/INFO]: 服务端正在以 PID 41584 运行中
+[Server] Waiting for the singleplayer bridge (loopback only)...
+[Server] [11:45:54] [Bridge/INFO]: Minecraft 26.3 / <local-path> World (4)
+[Server] [11:45:54] [Bridge/INFO]: [Bridge] Singleplayer world ready
+[Server] [11:45:54] [Bridge/INFO]: Player0 joined the singleplayer world
+[MCDR] [11:45:54] [TaskExecutor/INFO]: 玩家 [96mPlayer0[0m 的权限等级已设置为 [93mowner[0m
+[MCDR] [11:45:55] [mcdr-command-tree/INFO] [singleplayer_bridge]: MCDR command tree synchronized (4 chunks)
+[Server] [11:45:55] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:45:55] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:45:55] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:45:55] [Bridge/INFO]: <Player0> !!spbridge config backup off
+[MCDR] [11:45:55] [TaskExecutor/INFO]: 正在重载插件 prime_backup@1.13.1
+[MCDR] [11:45:55] [TaskExecutor/INFO]: Collected 2x extra plugins for reload due to dependency associations: singleplayer_prime_backup@0.3.2, test_command_probe@1.0.0
+[MCDR] [11:45:55] [TaskExecutor/INFO]: 插件 test_command_probe@1.0.0 已卸载
+[MCDR] [11:45:55] [TaskExecutor/INFO]: 插件 singleplayer_prime_backup@0.3.2 已卸载
+[MCDR] [11:45:55] [TaskExecutor/INFO] [prime_backup]: Shutting down everything...
+[MCDR] [11:45:55] [PB@f00b-shutdown/INFO] [prime_backup]: Scheduler has been shut down
+[MCDR] [11:45:55] [PB@f00b-worker-heavy/INFO] [prime_backup]: Worker heavy stopped
+[MCDR] [11:45:55] [PB@f00b-worker-light/INFO] [prime_backup]: Worker light stopped
+[MCDR] [11:45:55] [TaskExecutor/INFO] [prime_backup]: Shutdown completes
+[MCDR] [11:45:55] [TaskExecutor/INFO]: 插件 prime_backup@1.13.1 已卸载
+[MCDR] [11:45:55] [TaskExecutor/INFO]: 插件 prime_backup@1.13.1 已重载
+[MCDR] [11:45:55] [TaskExecutor/INFO]: 插件 singleplayer_prime_backup@0.3.2 已重载
+[MCDR] [11:45:55] [TaskExecutor/INFO]: 插件 test_command_probe@1.0.0 已重载
+[MCDR] [11:45:55] [CheckUpdate/INFO]: MCDR 已为最新版
+[MCDR] [11:45:56] [TaskExecutor/INFO] [prime_backup]: 配置文件已加载
+[MCDR] [11:45:56] [TaskExecutor/WARNING] [prime_backup]: Prime Backup is disabled by config
+[MCDR] [11:45:56] [TaskExecutor/INFO] [singleplayer_prime_backup]: 配置文件已加载
+[MCDR] [11:45:56] [TaskExecutor/INFO] [singleplayer_prime_backup]: Prime Backup 1.13.1 singleplayer adapter ready (one bound world, confirmed saves and shutdown)
+[Server] [11:45:56] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:45:57] [Bridge/INFO]: <Player0> !!spbridge config backup on
+[MCDR] [11:45:57] [TaskExecutor/INFO]: 正在重载插件 prime_backup@1.13.1
+[MCDR] [11:45:57] [TaskExecutor/INFO]: Collected 2x extra plugins for reload due to dependency associations: singleplayer_prime_backup@0.3.2, test_command_probe@1.0.0
+[MCDR] [11:45:57] [TaskExecutor/INFO]: 插件 test_command_probe@1.0.0 已卸载
+[MCDR] [11:45:57] [TaskExecutor/INFO]: 插件 singleplayer_prime_backup@0.3.2 已卸载
+[MCDR] [11:45:57] [TaskExecutor/INFO] [prime_backup]: Shutting down everything...
+[MCDR] [11:45:57] [TaskExecutor/INFO] [prime_backup]: Shutdown completes
+[MCDR] [11:45:57] [TaskExecutor/INFO]: 插件 prime_backup@1.13.1 已卸载
+[MCDR] [11:45:57] [mcdr-command-tree/INFO] [singleplayer_bridge]: MCDR command tree synchronized (2 chunks)
+[MCDR] [11:45:57] [TaskExecutor/INFO]: 插件 prime_backup@1.13.1 已重载
+[MCDR] [11:45:57] [TaskExecutor/INFO]: 插件 singleplayer_prime_backup@0.3.2 已重载
+[MCDR] [11:45:57] [TaskExecutor/INFO]: 插件 test_command_probe@1.0.0 已重载
+[MCDR] [11:45:58] [TaskExecutor/INFO] [prime_backup]: 配置文件已加载
+[MCDR] [11:45:58] [PB@dddf-worker-heavy/INFO] [prime_backup]: Worker heavy started
+[MCDR] [11:45:58] [PB@dddf-worker-light/INFO] [prime_backup]: Worker light started
+[MCDR] [11:45:58] [PB@dddf-crontab-scheduler/INFO] [prime_backup]: Scheduler started
+[MCDR] [11:45:58] [PB@dddf-init/INFO] [prime_backup]: Added job "CreateDbBackupJob.run" to job store "default"
+[MCDR] [11:45:58] [PB@dddf-init/INFO] [prime_backup]: Added job "VacuumSqliteJob.run" to job store "default"
+[MCDR] [11:45:58] [PB@dddf-init/INFO] [prime_backup]: Added job "CompactPackJob.run" to job store "default"
+[MCDR] [11:45:58] [TaskExecutor/INFO] [singleplayer_prime_backup]: 配置文件已加载
+[MCDR] [11:45:58] [TaskExecutor/INFO] [singleplayer_prime_backup]: Prime Backup 1.13.1 singleplayer adapter ready (one bound world, confirmed saves and shutdown)
+[Server] [11:45:58] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:45:58] [Bridge/INFO]: <Player0> !!spbridge config auto_backup on
+[MCDR] [11:45:58] [TaskExecutor/INFO]: 正在重载插件 prime_backup@1.13.1
+[MCDR] [11:45:58] [TaskExecutor/INFO]: Collected 2x extra plugins for reload due to dependency associations: singleplayer_prime_backup@0.3.2, test_command_probe@1.0.0
+[MCDR] [11:45:58] [TaskExecutor/INFO]: 插件 test_command_probe@1.0.0 已卸载
+[MCDR] [11:45:58] [TaskExecutor/INFO]: 插件 singleplayer_prime_backup@0.3.2 已卸载
+[MCDR] [11:45:58] [TaskExecutor/INFO] [prime_backup]: Shutting down everything...
+[MCDR] [11:45:58] [PB@dddf-shutdown/INFO] [prime_backup]: Scheduler has been shut down
+[MCDR] [11:45:58] [PB@dddf-worker-heavy/INFO] [prime_backup]: Worker heavy stopped
+[MCDR] [11:45:58] [PB@dddf-worker-light/INFO] [prime_backup]: Worker light stopped
+[MCDR] [11:45:58] [TaskExecutor/INFO] [prime_backup]: Shutdown completes
+[MCDR] [11:45:58] [TaskExecutor/INFO]: 插件 prime_backup@1.13.1 已卸载
+[MCDR] [11:45:58] [mcdr-command-tree/INFO] [singleplayer_bridge]: MCDR command tree synchronized (4 chunks)
+[MCDR] [11:45:58] [TaskExecutor/INFO]: 插件 prime_backup@1.13.1 已重载
+[MCDR] [11:45:58] [TaskExecutor/INFO]: 插件 singleplayer_prime_backup@0.3.2 已重载
+[MCDR] [11:45:58] [TaskExecutor/INFO]: 插件 test_command_probe@1.0.0 已重载
+[MCDR] [11:46:00] [TaskExecutor/INFO] [prime_backup]: 配置文件已加载
+[MCDR] [11:46:00] [PB@6942-worker-heavy/INFO] [prime_backup]: Worker heavy started
+[MCDR] [11:46:00] [PB@6942-worker-light/INFO] [prime_backup]: Worker light started
+[MCDR] [11:46:00] [PB@6942-crontab-scheduler/INFO] [prime_backup]: Scheduler started
+[MCDR] [11:46:00] [PB@6942-init/INFO] [prime_backup]: Added job "CreateDbBackupJob.run" to job store "default"
+[MCDR] [11:46:00] [PB@6942-init/INFO] [prime_backup]: Added job "ScheduledBackupJob.run" to job store "default"
+[MCDR] [11:46:00] [PB@6942-init/INFO] [prime_backup]: Added job "VacuumSqliteJob.run" to job store "default"
+[MCDR] [11:46:00] [PB@6942-init/INFO] [prime_backup]: Added job "CompactPackJob.run" to job store "default"
+[MCDR] [11:46:00] [TaskExecutor/INFO] [singleplayer_prime_backup]: 配置文件已加载
+[MCDR] [11:46:00] [TaskExecutor/INFO] [singleplayer_prime_backup]: Prime Backup 1.13.1 singleplayer adapter ready (one bound world, confirmed saves and shutdown)
+[Server] [11:46:00] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:46:00] [Bridge/INFO]: <Player0> !!spbridge config auto_delete on
+[MCDR] [11:46:00] [TaskExecutor/INFO]: 正在重载插件 prime_backup@1.13.1
+[MCDR] [11:46:00] [TaskExecutor/INFO]: Collected 2x extra plugins for reload due to dependency associations: singleplayer_prime_backup@0.3.2, test_command_probe@1.0.0
+[MCDR] [11:46:00] [TaskExecutor/INFO]: 插件 test_command_probe@1.0.0 已卸载
+[MCDR] [11:46:00] [TaskExecutor/INFO]: 插件 singleplayer_prime_backup@0.3.2 已卸载
+[MCDR] [11:46:00] [TaskExecutor/INFO] [prime_backup]: Shutting down everything...
+[MCDR] [11:46:00] [PB@6942-shutdown/INFO] [prime_backup]: Scheduler has been shut down
+[MCDR] [11:46:00] [PB@6942-worker-heavy/INFO] [prime_backup]: Worker heavy stopped
+[MCDR] [11:46:00] [PB@6942-worker-light/INFO] [prime_backup]: Worker light stopped
+[MCDR] [11:46:00] [TaskExecutor/INFO] [prime_backup]: Shutdown completes
+[MCDR] [11:46:00] [TaskExecutor/INFO]: 插件 prime_backup@1.13.1 已卸载
+[MCDR] [11:46:00] [TaskExecutor/INFO]: 插件 prime_backup@1.13.1 已重载
+[MCDR] [11:46:00] [TaskExecutor/INFO]: 插件 singleplayer_prime_backup@0.3.2 已重载
+[MCDR] [11:46:00] [TaskExecutor/INFO]: 插件 test_command_probe@1.0.0 已重载
+[MCDR] [11:46:02] [TaskExecutor/INFO] [prime_backup]: 配置文件已加载
+[MCDR] [11:46:02] [PB@de1c-worker-heavy/INFO] [prime_backup]: Worker heavy started
+[MCDR] [11:46:02] [PB@de1c-worker-light/INFO] [prime_backup]: Worker light started
+[MCDR] [11:46:02] [PB@de1c-crontab-scheduler/INFO] [prime_backup]: Scheduler started
+[MCDR] [11:46:02] [PB@de1c-init/INFO] [prime_backup]: Added job "CreateDbBackupJob.run" to job store "default"
+[MCDR] [11:46:02] [PB@de1c-init/INFO] [prime_backup]: Added job "PruneBackupJob.run" to job store "default"
+[MCDR] [11:46:02] [PB@de1c-init/INFO] [prime_backup]: Added job "ScheduledBackupJob.run" to job store "default"
+[MCDR] [11:46:02] [PB@de1c-init/INFO] [prime_backup]: Added job "VacuumSqliteJob.run" to job store "default"
+[MCDR] [11:46:02] [PB@de1c-init/INFO] [prime_backup]: Added job "CompactPackJob.run" to job store "default"
+[MCDR] [11:46:02] [TaskExecutor/INFO] [singleplayer_prime_backup]: 配置文件已加载
+[MCDR] [11:46:02] [TaskExecutor/INFO] [singleplayer_prime_backup]: Prime Backup 1.13.1 singleplayer adapter ready (one bound world, confirmed saves and shutdown)
+[Server] [11:46:02] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:46:02] [Bridge/INFO]: <Player0> !!extra_alias nested leaf alpha
+[Server] [11:46:02] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:46:02] [Bridge/INFO]: <Player0> !!MCDR plugin unload test_command_probe
+[MCDR] [11:46:02] [TaskExecutor/INFO]: 正在卸载插件 test_command_probe@1.0.0
+[MCDR] [11:46:02] [TaskExecutor/INFO]: 插件 test_command_probe@1.0.0 已卸载
+[Server] [11:46:02] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:46:02] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [11:46:02] [mcdr-command-tree/INFO] [singleplayer_bridge]: MCDR command tree synchronized (4 chunks)
+[Server] [11:46:02] [Bridge/INFO]: <Player0> !!MCDR plugin load test_command_probe.py
+[MCDR] [11:46:02] [TaskExecutor/INFO]: 正在从 <local-path> 加载插件
+[MCDR] [11:46:02] [TaskExecutor/INFO]: 插件 test_command_probe@1.0.0 已加载
+[Server] [11:46:02] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:46:02] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [11:46:02] [mcdr-command-tree/INFO] [singleplayer_bridge]: MCDR command tree synchronized (4 chunks)
+[Server] [11:46:03] [Bridge/INFO]: <Player0> !!MCDR plugin reload test_command_probe
+[MCDR] [11:46:03] [TaskExecutor/INFO]: 正在重载插件 test_command_probe@1.0.0
+[MCDR] [11:46:03] [TaskExecutor/INFO]: 插件 test_command_probe@1.0.0 已卸载
+[MCDR] [11:46:03] [TaskExecutor/INFO]: 插件 test_command_probe@1.0.0 已重载
+[Server] [11:46:03] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:46:03] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [11:46:03] [mcdr-command-tree/INFO] [singleplayer_bridge]: MCDR command tree synchronized (4 chunks)
+[Server] [11:46:03] [Bridge/INFO]: <Player0> !!pb make automatic-test
+[MCDR] [11:46:03] [PB@de1c-worker-heavy/INFO] [prime_backup]: [36m[PB][0m 创建备份中...请稍等
+[Server] [11:46:03] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:46:03] [Bridge/INFO]: Automatic saving is now disabled
+[Server] [11:46:03] [Bridge/INFO]: Saved the game
+[MCDR] [11:46:03] [PB@de1c-worker-heavy/INFO] [prime_backup]: Scanning file for backup creation at path '<local-path>', targets: ['New World (4)']
+[MCDR] [11:46:03] [PB@de1c-worker-heavy/INFO] [prime_backup]: Creating backup for ['New World (4)'] at path '<local-path>', file count 50 size 931.75KiB, timestamp 1790912763, creator 'player:Player0', comment 'automatic-test', tags {}
+[MCDR] [11:46:04] [PB@de1c-worker-heavy/INFO] [prime_backup]: Create backup #1 done, added 22 blobs, 0 chunks and 0 packs (size 79.15KiB / 931.09KiB)
+[MCDR] [11:46:04] [PB@de1c-worker-heavy/INFO] [prime_backup]: Time costs: save wait 0.12s, create backup 0.5s
+[MCDR] [11:46:04] [PB@de1c-worker-heavy/INFO] [prime_backup]: [36m[PB][0m 备份完成, ID [33m#1[0m, 耗时[93m0.62s[0m, 体积[92m931.75KiB[0m (+[92m79.15KiB[0m)
+[Server] [11:46:04] [Bridge/INFO]: <Player0> !!extra idle
+[Server] [11:46:04] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:46:04] [Bridge/INFO]: Automatic saving is now enabled
+[Server] [11:46:04] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:46:04] [Bridge/INFO]: <Player0> !!extra idle
+[Server] [11:46:04] [Bridge/INFO]: <Player0> !!extra idle
+[Server] [11:46:04] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:46:04] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:46:04] [Bridge/INFO]: <Player0> !!pb back 1 --confirm
+[MCDR] [11:46:04] [PB@de1c-worker-heavy/INFO] [prime_backup]: [36m[PB][0m 将要回档至备份[33m#1[0m: automatic-test
+[MCDR] [11:46:04] [PB@de1c-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m10秒后将[91m回档[0m至备份[33m#1[0m: automatic-test
+[Server] [11:46:04] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:46:04] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [11:46:05] [PB@de1c-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m9秒后将[91m回档[0m至备份[33m#1[0m: automatic-test
+[Server] [11:46:05] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [11:46:06] [PB@de1c-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m8秒后将[91m回档[0m至备份[33m#1[0m: automatic-test
+[Server] [11:46:06] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [11:46:07] [PB@de1c-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m7秒后将[91m回档[0m至备份[33m#1[0m: automatic-test
+[Server] [11:46:07] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [11:46:08] [PB@de1c-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m6秒后将[91m回档[0m至备份[33m#1[0m: automatic-test
+[Server] [11:46:08] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [11:46:09] [PB@de1c-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m5秒后将[91m回档[0m至备份[33m#1[0m: automatic-test
+[Server] [11:46:09] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [11:46:10] [PB@de1c-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m4秒后将[91m回档[0m至备份[33m#1[0m: automatic-test
+[Server] [11:46:10] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [11:46:11] [PB@de1c-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m3秒后将[91m回档[0m至备份[33m#1[0m: automatic-test
+[Server] [11:46:11] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [11:46:12] [PB@de1c-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m2秒后将[91m回档[0m至备份[33m#1[0m: automatic-test
+[Server] [11:46:12] [Bridge/INFO]: Command completed (result 1)
+[MCDR] [11:46:13] [PB@de1c-worker-heavy/INFO] [prime_backup]: [36m[PB][0m [91m!!! [0m1秒后将[91m回档[0m至备份[33m#1[0m: automatic-test
+[Server] [11:46:13] [Bridge/INFO]: Command completed (result 1)
+[Server] [11:46:14] [Bridge/INFO]: Saving and closing the singleplayer world
+[Server] [11:46:14] [Bridge/INFO]: Player0 left the singleplayer world
+[MCDR] [11:46:14] [PB@de1c-worker-heavy/INFO] [prime_backup]: Wait for server to stop
+[Server] [11:46:14] [Bridge/INFO]: Player0 left the game
+[Server] [11:46:15] [Bridge/INFO]: [Bridge] World closed; control session ended
+[MCDR] [11:46:15] [MainThread/INFO]: 服务器进程已停止，返回代码为 0
+[MCDR] [11:46:15] [MainThread/INFO]: 服务端已关闭
+[MCDR] [11:46:15] [PB@de1c-worker-heavy/INFO] [prime_backup]: Creating backup of existing files to avoid idiot
+[MCDR] [11:46:15] [PB@de1c-worker-heavy/INFO] [prime_backup]: Scanning file for backup creation at path '<local-path>', targets: ['New World (4)']
+[MCDR] [11:46:15] [PB@de1c-worker-heavy/INFO] [prime_backup]: Creating backup for ['New World (4)'] at path '<local-path>', file count 51 size 5.39MiB, timestamp 1790912775, creator 'prime_backup:pre_restore', comment '__pb_translated__:pre_restore:1', tags {'temporary': True}
+[MCDR] [11:46:16] [PB@de1c-worker-heavy/INFO] [prime_backup]: Create backup #2 done, added 9 blobs, 0 chunks and 0 packs (size 173.43KiB / 5.38MiB)
+[MCDR] [11:46:16] [PB@de1c-worker-heavy/INFO] [prime_backup]: Restoring to backup #1 (fail_soft=False, verify_blob=True)
+[MCDR] [11:46:16] [PB@de1c-worker-heavy/INFO] [prime_backup]: Exporting Backup(id=1, timestamp=1790912763, timestamp_ns_part=725420700, creator='player:Player0', comment='automatic-test', targets=['New World (4)'], tags={}, fileset_id_base=1, fileset_id_delta=2, file_count=50, file_raw_size_sum=954112, file_stored_size_sum=81758) to directory <local-path>
+[MCDR] [11:46:16] [PB@de1c-worker-heavy/INFO] [prime_backup]: Export done
+[MCDR] [11:46:16] [PB@de1c-worker-heavy/INFO] [prime_backup]: Restore to backup #1 done, cost 1.35s (backup 0.76s, restore 0.59s), starting the server
+[MCDR] [11:46:16] [PB@de1c-worker-heavy/INFO] [prime_backup]: 单人存档回档完成。请在 Minecraft 中重新进入原世界，MCDR 将自动连接对应存档配置。
+[MCDR] [11:46:16] [MainThread/INFO]: 正在关闭 MCDR
+[MCDR] [11:46:16] [TaskExecutor/INFO] [prime_backup]: Shutting down everything...
+[MCDR] [11:46:16] [PB@de1c-shutdown/INFO] [prime_backup]: Scheduler has been shut down
+[MCDR] [11:46:16] [PB@de1c-worker-heavy/INFO] [prime_backup]: Worker heavy stopped
+[MCDR] [11:46:16] [PB@de1c-worker-light/INFO] [prime_backup]: Worker light stopped
+[MCDR] [11:46:16] [TaskExecutor/INFO] [prime_backup]: Shutdown completes
+[MCDR] [11:46:16] [MainThread/INFO]: bye
+MCDReforged 2.16.0 is starting up
+MCDReforged is open source, u can find it here: https://github.com/MCDReforged/MCDReforged
+[MCDR] [11:46:18] [MainThread/INFO]: 语言已设置为 zh_cn
+[MCDR] [11:46:18] [MainThread/INFO]: 编码 / 解码方式已设置为 utf8 / utf8
+[MCDR] [11:46:18] [MainThread/INFO]: 解析处理器已设置为 vanilla_handler
+[MCDR] [11:46:18] [MainThread/INFO]: 插件文件夹列表:
+[MCDR] [11:46:18] [MainThread/INFO]: - <local-path>
+[MCDR] [11:46:18] [MainThread/INFO]: MCDReforged 2.16.0 正在启动
+[MCDR] [11:46:19] [MainThread/INFO]: MCDReforged 正于 Python 3.14.5 环境中运行
+[MCDR] [11:46:19] [TaskExecutor/INFO]: 刷新所有插件中
+[MCDR] [11:46:19] [TaskExecutor/INFO]: 插件 prime_backup@1.13.1 已加载
+[MCDR] [11:46:19] [TaskExecutor/INFO]: 插件 singleplayer_bridge@0.3.2 已加载
+[MCDR] [11:46:19] [TaskExecutor/INFO]: 插件 singleplayer_prime_backup@0.3.2 已加载
+[MCDR] [11:46:19] [TaskExecutor/INFO]: 插件 test_command_probe@1.0.0 已加载
+[MCDR] [11:46:20] [TaskExecutor/INFO] [prime_backup]: 配置文件已加载
+[MCDR] [11:46:20] [PB@5c28-worker-heavy/INFO] [prime_backup]: Worker heavy started
+[MCDR] [11:46:20] [PB@5c28-worker-light/INFO] [prime_backup]: Worker light started
+[MCDR] [11:46:20] [PB@5c28-crontab-scheduler/INFO] [prime_backup]: Scheduler started
+[MCDR] [11:46:20] [PB@5c28-init/INFO] [prime_backup]: Added job "CreateDbBackupJob.run" to job store "default"
+[MCDR] [11:46:20] [PB@5c28-init/INFO] [prime_backup]: Added job "PruneBackupJob.run" to job store "default"
+[MCDR] [11:46:20] [PB@5c28-init/INFO] [prime_backup]: Added job "ScheduledBackupJob.run" to job store "default"
+[MCDR] [11:46:20] [PB@5c28-init/INFO] [prime_backup]: Added job "VacuumSqliteJob.run" to job store "default"
+[MCDR] [11:46:20] [PB@5c28-init/INFO] [prime_backup]: Added job "CompactPackJob.run" to job store "default"
+[MCDR] [11:46:20] [TaskExecutor/INFO] [singleplayer_bridge]: 单人桥接已加载。MCDR 的 start/stop/kill 管理代理连接；不会关闭或重启游戏世界。
+[MCDR] [11:46:20] [TaskExecutor/INFO] [singleplayer_prime_backup]: 配置文件已加载
+[MCDR] [11:46:20] [TaskExecutor/INFO] [singleplayer_prime_backup]: Prime Backup 1.13.1 singleplayer adapter ready (one bound world, confirmed saves and shutdown)
+[MCDR] [11:46:20] [TaskExecutor/INFO]: 使用插件 singleplayer_bridge@0.3.2 提供的解析处理器 singleplayer_bridge_handler
+[MCDR] [11:46:20] [TaskExecutor/INFO]: 共加载: [37m[2m4[0m 个插件; 已加载插件数: [37m[2m6[0m
+[MCDR] [11:46:20] [MainThread/INFO]: 正在启动服务端，启动参数为 ['<local-path>', '<local-path>', '--config-env']
+[MCDR] [11:46:20] [MainThread/INFO]: 服务端正在以 PID 33360 运行中
+[Server] Waiting for the singleplayer bridge (loopback only)...
+[Server] [11:46:20] [Bridge/INFO]: Minecraft 26.3 / <local-path> World (4)
+[Server] [11:46:20] [Bridge/INFO]: [Bridge] Singleplayer world ready
+[Server] [11:46:20] [Bridge/INFO]: Player0 joined the singleplayer world
+[MCDR] [11:46:20] [TaskExecutor/INFO]: 玩家 [96mPlayer0[0m 的权限等级已设置为 [93mowner[0m
+[Server] [11:46:20] [Bridge/INFO]: Player0 left the singleplayer world
+[Server] [11:46:20] [Bridge/INFO]: Player0 left the game
+[MCDR] [11:46:20] [mcdr-command-tree/INFO] [singleplayer_bridge]: MCDR command tree synchronized (4 chunks)
+[Server] [11:46:21] [Bridge/INFO]: [Bridge] World closed; control session ended
+[MCDR] [11:46:21] [MainThread/INFO]: 服务器进程已停止，返回代码为 0
+[MCDR] [11:46:21] [MainThread/INFO]: 服务端已关闭
+[MCDR] [11:46:21] [CheckUpdate/INFO]: MCDR 已为最新版
+[MCDR] [11:46:21] [MainThread/INFO]: 正在关闭 MCDR
+[MCDR] [11:46:21] [TaskExecutor/INFO] [prime_backup]: Shutting down everything...
+[MCDR] [11:46:21] [PB@5c28-shutdown/INFO] [prime_backup]: Scheduler has been shut down
+[MCDR] [11:46:21] [PB@5c28-worker-heavy/INFO] [prime_backup]: Worker heavy stopped
+[MCDR] [11:46:21] [PB@5c28-worker-light/INFO] [prime_backup]: Worker light stopped
+[MCDR] [11:46:21] [TaskExecutor/INFO] [prime_backup]: Shutdown completes
+[MCDR] [11:46:22] [MainThread/INFO]: bye

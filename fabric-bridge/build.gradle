@@ -1,0 +1,45 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    testImplementation platform('org.junit:junit-bom:5.13.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.register('bundleInstaller', Zip) {
+    archiveFileName = 'mcdr-install.zip'
+    destinationDirectory = layout.buildDirectory.dir('installer')
+    from('../python') { into 'runtime'; exclude '**/__pycache__/**', '**/*.pyc', 'mcdreforged.plugin.json', '.gitignore' }
+    from('../python/bridge_bootstrap.py')
+    from('../python') { into 'bridge-plugin'; exclude '**/__pycache__/**', '**/*.pyc', 'bridge_*.py', '.gitignore' }
+    from('../prime-backup-adapter') { into 'adapter-plugin'; exclude '**/__pycache__/**', '**/*.pyc' }
+    from('../requirements-prime-backup.txt')
+}
+processResources {
+    dependsOn tasks.named('bundleInstaller')
+    from(tasks.named('bundleInstaller').flatMap { it.archiveFile })
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') { expand version: project.version }
+}
+tasks.withType(JavaCompile).configureEach { options.release = 25 }
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+    withSourcesJar()
+}
+test { useJUnitPlatform() }
+jar { from('../LICENSE') }
+
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = 'singleplayer_bridge_gametest'
+        enableGameTests = false
+        enableClientGameTests = true
+    }
+}

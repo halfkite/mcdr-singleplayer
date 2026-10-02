@@ -1,0 +1,37 @@
+MCDReforged 2.16.0 is starting up
+MCDReforged is open source, u can find it here: https://github.com/MCDReforged/MCDReforged
+[MCDR] [23:33:12] [MainThread/INFO]: Language is set to en_us
+[MCDR] [23:33:12] [MainThread/INFO]: Encoding / Decoding method has set to utf8 / utf8
+[MCDR] [23:33:12] [MainThread/INFO]: Server handler is set to vanilla_handler
+[MCDR] [23:33:12] [MainThread/INFO]: Plugin directory list:
+[MCDR] [23:33:12] [MainThread/INFO]: - <local-path>
+[MCDR] [23:33:12] [MainThread/INFO]: MCDReforged 2.16.0 is starting
+[MCDR] [23:33:12] [MainThread/INFO]: MCDReforged is running on Python 3.14.5 environment
+[MCDR] [23:33:12] [TaskExecutor/INFO]: Refreshing all plugins
+[MCDR] [23:33:12] [TaskExecutor/INFO]: Plugin prime_backup@1.13.1 loaded
+[MCDR] [23:33:12] [TaskExecutor/INFO]: Plugin singleplayer_bridge@0.3.0 loaded
+[MCDR] [23:33:12] [TaskExecutor/INFO]: Plugin singleplayer_prime_backup@0.3.0 loaded
+[MCDR] [23:33:13] [TaskExecutor/INFO] [prime_backup]: Config file loaded
+[MCDR] [23:33:13] [TaskExecutor/WARNING] [prime_backup]: Prime Backup is disabled by config
+[MCDR] [23:33:13] [TaskExecutor/INFO] [singleplayer_bridge]: 单人桥接已加载。MCDR 的 start/stop/kill 管理代理连接；不会关闭或重启游戏世界。
+[MCDR] [23:33:13] [TaskExecutor/INFO] [singleplayer_prime_backup]: Config file loaded
+[MCDR] [23:33:13] [TaskExecutor/INFO] [singleplayer_prime_backup]: Prime Backup 1.13.1 singleplayer adapter ready (one bound world, confirmed saves and shutdown)
+[MCDR] [23:33:13] [TaskExecutor/INFO]: Using server handler singleplayer_bridge_handler provided by singleplayer_bridge@0.3.0
+[MCDR] [23:33:13] [TaskExecutor/INFO]: Loaded: [37m[2m3[0m plugins; Active plugin count: [37m[2m5[0m
+[MCDR] [23:33:13] [MainThread/INFO]: Starting the server with command ['<local-path>', '<local-path>', '--config-env']
+[MCDR] [23:33:13] [MainThread/INFO]: Server is running at PID 3112
+[Server] Waiting for the singleplayer bridge (loopback only)...
+[Server] [23:33:13] [Bridge/INFO]: Minecraft 26.3 / <local-path> World (5)
+[Server] [23:33:13] [Bridge/INFO]: [Bridge] Singleplayer world ready
+[Server] [23:33:13] [Bridge/INFO]: Player0 joined the singleplayer world
+[Server] [23:33:13] [Bridge/INFO]: <Player0> !!spbridge profile import "New World (4)" --replace
+[Server] [23:33:13] [Bridge/INFO]: Command completed (result 1)
+[Server] [23:33:13] [Bridge/INFO]: Player0 left the singleplayer world
+[Server] [23:33:13] [Bridge/INFO]: Player0 left the game
+[Server] [23:33:14] [Bridge/INFO]: [Bridge] World closed; control session ended
+[MCDR] [23:33:14] [MainThread/INFO]: Server process stopped with code 0
+[MCDR] [23:33:14] [MainThread/INFO]: Server stopped
+[MCDR] [23:33:14] [MainThread/INFO]: Stopping MCDR
+[MCDR] [23:33:14] [TaskExecutor/INFO] [prime_backup]: Shutting down everything...
+[MCDR] [23:33:14] [TaskExecutor/INFO] [prime_backup]: Shutdown completes
+[MCDR] [23:33:14] [MainThread/INFO]: bye
