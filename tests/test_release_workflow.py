@@ -65,3 +65,9 @@ def test_curseforge_upload_metadata(tmp_path, monkeypatch, loader):
     assert metadata['gameVersionNames'] == expected + ['Fabric' if loader == 'fabric' else 'NeoForge', 'Client']
     assert b'test-only-token' not in body
     assert ('relations' in metadata) == (loader == 'fabric')
+    if loader == 'fabric':
+        dependency = metadata['relations']['projects'][0]
+        assert type(dependency['projectID']) is int
+        assert dependency['projectID'] == 306612
+        assert dependency['slug'] == 'fabric-api'
+        assert dependency['type'] == 'requiredDependency'

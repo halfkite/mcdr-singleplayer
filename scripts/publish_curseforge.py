@@ -44,7 +44,7 @@ def main():
                 'releaseType': 'beta' if release['isPrerelease'] else 'release',
                 'gameVersionNames': versions + ['Fabric' if args.loader == 'fabric' else 'NeoForge', 'Client']}
     if args.loader == 'fabric':
-        metadata['relations'] = {'projects': [{'slug': 'fabric-api', 'projectID': '306612', 'type': 'requiredDependency'}]}
+        metadata['relations'] = {'projects': [{'slug': 'fabric-api', 'projectID': 306612, 'type': 'requiredDependency'}]}
     boundary = 'mcdr-upload-' + uuid.uuid4().hex
     body = (f'--{boundary}\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n'.encode()
             + json.dumps(metadata).encode() + b'\r\n'
