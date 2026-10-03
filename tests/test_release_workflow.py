@@ -10,12 +10,12 @@ import check_release
 import publish_curseforge
 
 
-@pytest.mark.parametrize('tag,draft,allowed', [('v0.3.10', False, True), ('0.3.10', False, True),
+@pytest.mark.parametrize('tag,draft,allowed', [('v0.4.0', False, True), ('0.4.0', False, True),
                                                ('v0.3.9', False, False), ('v0.3.10', True, False)])
 def test_release_tag_guard(tmp_path, monkeypatch, tag, draft, allowed):
     monkeypatch.chdir(tmp_path)
     (tmp_path / 'compat').mkdir()
-    (tmp_path / 'compat/versions.json').write_text(json.dumps({'modVersion': '0.3.10'}))
+    (tmp_path / 'compat/versions.json').write_text(json.dumps({'modVersion': '0.4.0'}))
     (tmp_path / 'release-metadata.json').write_text(json.dumps({'tagName': tag, 'isDraft': draft, 'isPrerelease': True}))
     if allowed:
         check_release.main()

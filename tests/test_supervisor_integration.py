@@ -86,7 +86,7 @@ def on_load(server, previous):
             expected = 2 if index == 2 else 1
             wait(lambda: read_json(profile / 'config/profile_probe/state.json')['loads'] == expected)
             log = common / 'log' / profile.name / 'controller-child.log'
-            wait(lambda: 'singleplayer_prime_backup@0.3.10 loaded' in log.read_text(encoding='utf8'))
+            wait(lambda: 'singleplayer_prime_backup@0.4.0 loaded' in log.read_text(encoding='utf8'))
             assert (common / 'log' / profile.name / 'MCDR.log').is_file()
             assert 'Fail to load' not in log.read_text(encoding='utf8')
             connection.sendall(encode_frame(dict(type='world_stopped', session=session)))

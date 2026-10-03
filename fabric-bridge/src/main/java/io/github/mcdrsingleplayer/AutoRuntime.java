@@ -52,6 +52,8 @@ final class AutoRuntime {
     }
 
     boolean pythonMissing() { return pythonStatus == PythonStatus.MISSING; }
+    boolean pythonReady() { return pythonStatus == PythonStatus.READY; }
+    boolean autoInstallEnabled() { return config.autoInstall; }
 
     synchronized void requestSetup(String action, String player) {
         JsonObject request = new JsonObject();
@@ -101,7 +103,7 @@ final class AutoRuntime {
             pythonStatus = PythonStatus.READY;
             try {
                 Files.createDirectories(common);
-                Path resources = common.resolve("runtime/bootstrap-resources-0.3.10");
+                Path resources = common.resolve("runtime/bootstrap-resources-0.4.0");
                 extract(resources);
                 List<String> command;
                 if (config.autoInstall) command = new ArrayList<>(List.of(python, resources.resolve("bridge_bootstrap.py").toString(),

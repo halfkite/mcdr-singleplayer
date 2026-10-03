@@ -13,9 +13,11 @@ final class PythonSetupScreen extends Screen {
     private static final String WINDOWS_DIRECT = "https://www.python.org/ftp/python/3.14.8/python-3.14.8-amd64.exe";
     private static final String WINDOWS_MIRROR = "https://mirrors.aliyun.com/python-release/windows/python-3.14.8-amd64.exe";
     private static final String DOWNLOADS_PAGE = "https://www.python.org/downloads/";
+    private final Runnable onDismiss;
 
-    PythonSetupScreen() {
+    PythonSetupScreen(Runnable onDismiss) {
         super(Component.translatable("mcdr-singleplayer.python.required_title"));
+        this.onDismiss = onDismiss;
     }
 
     @Override
@@ -26,12 +28,17 @@ final class PythonSetupScreen extends Screen {
         var version = Component.translatable("mcdr-singleplayer.python.latest_stable", PYTHON_VERSION);
         int versionLines = font.split(version, textWidth).size();
         int buttonCount = windowsX64() ? 3 : 1;
-        int contentHeight = 24 + intro.size() * 10 + 12 + versionLines * 10 + 8
-                + instructions.size() * 10 + 10 + buttonCount * 24;
+        int buttonOffset = 46 + intro.size() * 10 + 8 + versionLines * 10 + 8
+                + instructions.size() * 10 + 8 + 18;
+        int contentHeight = buttonOffset + buttonCount * 24;
         int top = Math.max(20, (height - contentHeight) / 2);
+        int panelWidth = Math.min(400, width - 24);
+        int panelLeft = (width - panelWidth) / 2;
         int buttonWidth = Math.min(320, width - 40);
         int buttonX = (width - buttonWidth) / 2;
-        int y = top + 20 + intro.size() * 10 + 8 + versionLines * 10 + 8 + instructions.size() * 10 + 8;
+        addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.python.close"), button -> onClose())
+                .bounds(panelLeft + panelWidth - 78, top - 6, 68, 20).build());
+        int y = top + buttonOffset;
 
         if (windowsX64()) {
             addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.python.windows_direct"),
@@ -54,16 +61,17 @@ final class PythonSetupScreen extends Screen {
         var instructions = font.split(Component.translatable("mcdr-singleplayer.python.install_instructions"), textWidth);
         var version = font.split(Component.translatable("mcdr-singleplayer.python.latest_stable", PYTHON_VERSION), textWidth);
         int buttonCount = windowsX64() ? 3 : 1;
-        int contentHeight = 24 + intro.size() * 10 + 12 + version.size() * 10 + 8
-                + instructions.size() * 10 + 10 + buttonCount * 24;
+        int contentHeight = 46 + intro.size() * 10 + 8 + version.size() * 10 + 8
+                + instructions.size() * 10 + 8 + 18 + buttonCount * 24;
         int top = Math.max(20, (height - contentHeight) / 2);
         int panelBottom = Math.min(height - 12, top + contentHeight);
         graphics.fill(0, 0, width, height, 0x90000000);
         graphics.fill(panelLeft, top - 8, panelLeft + panelWidth, panelBottom + 8, 0xd0101010);
         graphics.fill(panelLeft, top - 8, panelLeft + panelWidth, top - 7, 0xff555555);
-        int y = top;
+        graphics.centeredText(font, Component.translatable("mcdr-singleplayer.mod_name"), width / 2, top - 2, 0xffaaaaaa);
+        int y = top + 20;
         graphics.centeredText(font, title, width / 2, y, 0xffffffff);
-        y += 24;
+        y += 26;
         for (var line : intro) {
             graphics.centeredText(font, line, width / 2, y, 0xffdddddd);
             y += 10;
@@ -78,10 +86,17 @@ final class PythonSetupScreen extends Screen {
             graphics.centeredText(font, line, width / 2, y, 0xffaaaaaa);
             y += 10;
         }
+        y += 8;
+        graphics.centeredText(font, Component.translatable("mcdr-singleplayer.python.escape_hint"), width / 2, y, 0xff888888);
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
     }
 
-    @Override public boolean shouldCloseOnEsc() { return false; }
+    @Override public void onClose() {
+        super.onClose();
+        onDismiss.run();
+    }
+
+    @Override public boolean shouldCloseOnEsc() { return true; }
     @Override public boolean isPauseScreen() { return true; }
 
     private static boolean windowsX64() {

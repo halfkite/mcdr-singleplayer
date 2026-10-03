@@ -32,6 +32,10 @@ public final class SingleplayerBridge implements ModInitializer {
     private Path configPath;
     private RestoreProgressMonitor restoreProgress;
     private boolean showingPythonPrompt;
+    private boolean pythonPromptDismissed;
+    private boolean pythonWasMissingInWorld;
+    private boolean showingMcdrInstallNotice;
+    private boolean mcdrInstallNoticeShown;
     private final ClientCommandTree clientCommands = new ClientCommandTree(() -> endpoint, this::forward);
     private final Map<ServerLevel, Boolean> previousAutoSave = new HashMap<>();
     private volatile boolean restoreAutoSaveNeeded;
@@ -129,13 +133,29 @@ public final class SingleplayerBridge implements ModInitializer {
             if (runtime != null) {
                 boolean inSingleplayer = client.getSingleplayerServer() != null && client.player != null && client.level != null;
                 if (runtime.pythonMissing() && inSingleplayer) {
-                    if (!showingPythonPrompt) {
-                        client.gui.setScreen(new PythonSetupScreen());
+                    pythonWasMissingInWorld = true;
+                    if (!showingPythonPrompt && !pythonPromptDismissed) {
                         showingPythonPrompt = true;
+                        client.gui.setScreen(new PythonSetupScreen(() -> {
+                            showingPythonPrompt = false;
+                            pythonPromptDismissed = true;
+                        }));
                     }
-                } else if (showingPythonPrompt) {
-                    client.gui.setScreen(null);
+                } else if (runtime.pythonReady() && inSingleplayer && pythonWasMissingInWorld && !mcdrInstallNoticeShown) {
                     showingPythonPrompt = false;
+                    mcdrInstallNoticeShown = true;
+                    showingMcdrInstallNotice = true;
+                    client.gui.setScreen(new McdrInstallNoticeScreen(runtime.autoInstallEnabled(),
+                            () -> showingMcdrInstallNotice = false));
+                } else if (!inSingleplayer) {
+                    if ((showingPythonPrompt && client.gui.screen() instanceof PythonSetupScreen)
+                            || (showingMcdrInstallNotice && client.gui.screen() instanceof McdrInstallNoticeScreen)) {
+                        client.gui.setScreen(null);
+                    }
+                    showingPythonPrompt = false;
+                    showingMcdrInstallNotice = false;
+                    pythonPromptDismissed = false;
+                    pythonWasMissingInWorld = false;
                 }
             }
             BridgeEndpoint bridge = endpoint;

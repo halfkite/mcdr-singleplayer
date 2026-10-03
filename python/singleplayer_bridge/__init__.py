@@ -1,6 +1,6 @@
 """MCDR entrypoint. The standalone proxy needs only Python's standard library."""
 
-__version__ = '0.3.10'
+__version__ = '0.4.0'
 
 
 def on_load(server, prev_module):

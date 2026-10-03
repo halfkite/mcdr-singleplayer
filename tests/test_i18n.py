@@ -83,3 +83,18 @@ def test_mod_metadata_points_to_packaged_png_icon():
     image = (resources / metadata['icon']).read_bytes()
     assert image[:8] == b'\x89PNG\r\n\x1a\n'
     assert struct.unpack('>II', image[16:24]) == (128, 128)
+
+
+def test_python_setup_screens_have_translations_in_every_client_language():
+    required = {
+        'mcdr-singleplayer.mod_name',
+        'mcdr-singleplayer.python.close',
+        'mcdr-singleplayer.python.escape_hint',
+        'mcdr-singleplayer.python.mcdr_install_title',
+        'mcdr-singleplayer.python.mcdr_install_intro',
+        'mcdr-singleplayer.python.mcdr_ready_title',
+        'mcdr-singleplayer.python.mcdr_ready_intro',
+    }
+    for language in ['zh_cn', 'zh_tw', 'en_us']:
+        values = json.loads((ROOT / 'python/singleplayer_bridge/lang' / (language + '.json')).read_text(encoding='utf-8'))
+        assert required <= values.keys()
