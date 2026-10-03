@@ -9,6 +9,23 @@ import pytest
 
 import check_release
 import publish_curseforge
+import verify_artifacts
+
+
+def test_release_jar_checksum_uses_github_asset_digest_without_sidecar(tmp_path):
+    import hashlib
+    artifact = tmp_path / 'mod.jar'
+    artifact.write_bytes(b'test jar')
+    assets = tmp_path / 'release-assets.json'
+    assets.write_text(json.dumps({'assets': [{'name': artifact.name, 'digest':
+                                            'sha256:' + hashlib.sha256(artifact.read_bytes()).hexdigest()}]}))
+    verify_artifacts.verify_checksum(artifact, assets)
+    artifact.write_bytes(b'tampered jar')
+    with pytest.raises(AssertionError, match='checksum mismatch'):
+        verify_artifacts.verify_checksum(artifact, assets)
+    assets.write_text(json.dumps({'assets': [{'name': artifact.name, 'digest': None}]}))
+    with pytest.raises(AssertionError, match='Missing GitHub'):
+        verify_artifacts.verify_checksum(artifact, assets)
 
 
 @pytest.mark.parametrize('body', [b'not JSON', b'{"headers":{"X-Api-Token":"test-only-token"}}',

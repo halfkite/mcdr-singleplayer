@@ -27,6 +27,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag }}
+      - name: Load current upload tools for older Release tags
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: .upload-tools
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -41,11 +46,12 @@ jobs:
           python scripts/check_release.py
           MOD_VERSION=$(jq -r .modVersion compat/versions.json)
           FILE_BASE="mcdr-singleplayer-${MOD_VERSION}+${MOD_LOADER}+mc${MOD_FAMILY}"
-          gh release download "$RELEASE_TAG" --pattern "${FILE_BASE}.jar" --pattern "${FILE_BASE}.sha256" --dir dist
-          python scripts/verify_artifacts.py --loader "$MOD_LOADER" --family "$MOD_FAMILY"
+          gh release download "$RELEASE_TAG" --pattern "${FILE_BASE}.jar" --dir dist
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > release-assets.json
+          python .upload-tools/scripts/verify_artifacts.py --source-root . --loader "$MOD_LOADER" --family "$MOD_FAMILY" --release-assets release-assets.json
       - name: Upload verified family JAR to CurseForge
         env:
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
           MOD_LOADER: ${{ inputs.loader }}
           MOD_FAMILY: ${{ inputs.family }}
-        run: python scripts/publish_curseforge.py --loader "$MOD_LOADER" --family "$MOD_FAMILY"
+        run: python .upload-tools/scripts/publish_curseforge.py --source-root . --loader "$MOD_LOADER" --family "$MOD_FAMILY"

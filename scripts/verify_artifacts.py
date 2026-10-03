@@ -11,7 +11,20 @@ from zipfile import ZipFile
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def verify(loader, family):
+def verify_checksum(path, release_assets=None):
+    if release_assets is None:
+        expected_hash = path.with_suffix('.sha256').read_text().split()[0]
+    else:
+        assets = json.loads(Path(release_assets).read_text(encoding='utf8'))['assets']
+        matches = [asset for asset in assets if asset['name'] == path.name]
+        assert len(matches) == 1, 'Missing or ambiguous Release artifact'
+        digest = matches[0].get('digest') or ''
+        assert digest.startswith('sha256:') and len(digest) == 71, 'Missing GitHub artifact SHA-256 digest'
+        expected_hash = digest.removeprefix('sha256:')
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == expected_hash, 'Artifact checksum mismatch'
+
+
+def verify(loader, family, release_assets=None):
     matrix = json.loads((ROOT / 'compat/versions.json').read_text(encoding='utf8'))
     rows = [r for r in matrix['versions'] if r['family'] == family]
     path = ROOT / 'dist' / f"mcdr-singleplayer-{matrix['modVersion']}+{loader}+mc{family}.jar"
@@ -53,19 +66,23 @@ def verify(loader, family):
             assert loader_dep['versionRange'] == ('[21.0,)' if family == '1.21.x' else '[26.1,)')
             dep = next(d for d in metadata['dependencies']['mcdr_singleplayer'] if d['modId'] == 'minecraft')
             assert dep['versionRange'] == ','.join('[' + r['minecraft'] + ']' for r in rows)
-    expected_hash = path.with_suffix('.sha256').read_text().split()[0]
-    assert hashlib.sha256(path.read_bytes()).hexdigest() == expected_hash
+    verify_checksum(path, release_assets)
     print('Verified', path.name, len(rows), 'game adapters')
 
 
 def main():
+    global ROOT
     parser = argparse.ArgumentParser()
     parser.add_argument('--loader', choices=['fabric', 'neoforge'])
     parser.add_argument('--family', choices=['1.21.x', '26.x'])
+    parser.add_argument('--release-assets', type=Path)
+    parser.add_argument('--source-root', type=Path)
     args = parser.parse_args()
+    if args.source_root:
+        ROOT = args.source_root.resolve()
     for loader in ([args.loader] if args.loader else ['fabric', 'neoforge']):
         for family in ([args.family] if args.family else ['1.21.x', '26.x']):
-            verify(loader, family)
+            verify(loader, family, args.release_assets)
 
 
 if __name__ == '__main__':

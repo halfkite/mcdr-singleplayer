@@ -68,6 +68,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: mcdr-singleplayer-${{ matrix.loader }}-${{ matrix.family }}
-          path: |
-            dist/*.jar
-            dist/*.sha256
+          path: dist/*.jar

@@ -27,10 +27,14 @@ def upload_error_detail(error, token):
 
 
 def main():
+    global ROOT
     parser = argparse.ArgumentParser()
     parser.add_argument('--loader', choices=['fabric', 'neoforge'], required=True)
     parser.add_argument('--family', choices=['1.21.x', '26.x'], required=True)
+    parser.add_argument('--source-root', type=Path)
     args = parser.parse_args()
+    if args.source_root:
+        ROOT = args.source_root.resolve()
     token = os.environ.get('CURSEFORGE_TOKEN')
     if not token:
         raise SystemExit('Set the repository Actions Secret CURSEFORGE_TOKEN before uploading')

@@ -65,14 +65,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: mcdr-singleplayer-${{ inputs.loader }}-${{ matrix.family }}
-          path: |
-            dist/*.jar
-            dist/*.sha256
-      - name: Attach JAR and checksum to GitHub Release
+          path: dist/*.jar
+      - name: Attach JAR to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
-        run: gh release upload "$RELEASE_TAG" dist/*.jar dist/*.sha256 --clobber
+        run: gh release upload "$RELEASE_TAG" dist/*.jar --clobber
       - name: Upload family JAR to CurseForge
         if: ${{ inputs.curseforge }}
         env:
