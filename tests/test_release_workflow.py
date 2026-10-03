@@ -2,12 +2,23 @@
 import io
 import json
 import sys
+from urllib.error import HTTPError
 from pathlib import Path
 
 import pytest
 
 import check_release
 import publish_curseforge
+
+
+@pytest.mark.parametrize('body', [b'not JSON', b'{"headers":{"X-Api-Token":"test-only-token"}}',
+                                b'{"message":"Invalid dependency test-only-token"}'])
+def test_curseforge_error_diagnostics_do_not_expose_credentials(body):
+    error = HTTPError('https://example.invalid/upload', 400, 'Bad request', {}, io.BytesIO(body))
+    detail = publish_curseforge.upload_error_detail(error, 'test-only-token')
+    assert 'test-only-token' not in detail
+    if b'message' in body:
+        assert 'Invalid dependency' in detail
 
 
 @pytest.mark.parametrize('tag,draft,allowed', [('v0.4.0', False, True), ('0.4.0', False, True),

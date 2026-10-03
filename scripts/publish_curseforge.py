@@ -10,6 +10,22 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def upload_error_detail(error, token):
+    """Expose API validation messages without logging credentials or response headers."""
+    try:
+        payload = json.loads(error.read(8192))
+    except (ValueError, OSError):
+        return ''
+    if not isinstance(payload, dict):
+        return ''
+    details = [payload[key] for key in ('message', 'Message', 'errorMessage', 'ErrorMessage', 'error', 'errors')
+               if payload.get(key)]
+    if not details:
+        return ''
+    message = json.dumps(details, ensure_ascii=True).replace(token, '[redacted]')
+    return ' '.join(message.split())[:1000]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--loader', choices=['fabric', 'neoforge'], required=True)
@@ -40,8 +56,9 @@ def main():
         with urlopen(request, timeout=180) as response:
             result = json.load(response)
     except HTTPError as error:
-        # Do not print response headers/body: upstream errors may include credentials.
-        raise SystemExit(f'CurseForge upload rejected (HTTP {error.code}); inspect project upload permissions') from None
+        detail = upload_error_detail(error, token)
+        suffix = ': ' + detail if detail else '; inspect project upload permissions'
+        raise SystemExit(f'CurseForge upload rejected (HTTP {error.code})' + suffix) from None
     print('CurseForge uploaded file', result.get('id'), filename)
 
 

@@ -1,0 +1,51 @@
+name: Upload existing Release file to CurseForge
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing published Release tag
+        required: true
+        type: string
+      loader:
+        required: true
+        type: choice
+        options: [fabric, neoforge]
+      family:
+        required: true
+        type: choice
+        options: [1.21.x, 26.x]
+permissions:
+  contents: read
+concurrency:
+  group: curseforge-retry-${{ inputs.tag }}-${{ inputs.loader }}-${{ inputs.family }}
+  cancel-in-progress: false
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download and verify published family JAR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          MOD_LOADER: ${{ inputs.loader }}
+          MOD_FAMILY: ${{ inputs.family }}
+        run: |
+          gh release view "$RELEASE_TAG" --json tagName,isPrerelease,isDraft,body > release-metadata.json
+          python scripts/check_release.py
+          MOD_VERSION=$(jq -r .modVersion compat/versions.json)
+          FILE_BASE="mcdr-singleplayer-${MOD_VERSION}+${MOD_LOADER}+mc${MOD_FAMILY}"
+          gh release download "$RELEASE_TAG" --pattern "${FILE_BASE}.jar" --pattern "${FILE_BASE}.sha256" --dir dist
+          python scripts/verify_artifacts.py --loader "$MOD_LOADER" --family "$MOD_FAMILY"
+      - name: Upload verified family JAR to CurseForge
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+          MOD_LOADER: ${{ inputs.loader }}
+          MOD_FAMILY: ${{ inputs.family }}
+        run: python scripts/publish_curseforge.py --loader "$MOD_LOADER" --family "$MOD_FAMILY"
