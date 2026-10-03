@@ -17,7 +17,7 @@ def fabric_metadata(row):
     metadata['version'] = MATRIX['modVersion']
     metadata['entrypoints'] = {'main': [BASE + '.bootstrap.FabricEntry']}
     metadata['mixins'] = ['mcdr-family.mixins.json']
-    metadata['depends'] = {'fabricloader': '>=' + MATRIX['fabricLoader'], 'minecraft': row['minecraft'],
+    metadata['depends'] = {'fabricloader': '>=' + MATRIX['fabricLoaderMinimum'], 'minecraft': row['minecraft'],
                            'java': '>=' + str(row['java']), 'fabric-api': '*'}
     metadata['contact'] = {'homepage': 'https://github.com/halfkite/mcdr-singleplayer',
                            'sources': 'https://github.com/halfkite/mcdr-singleplayer',
@@ -44,7 +44,7 @@ config="mcdr-family.mixins.json"
 [[dependencies.mcdr_singleplayer]]
 modId="neoforge"
 type="required"
-versionRange="[{'21.0' if row['java'] == 21 else '26.1.0.19-beta'},)"
+versionRange="[{'21.0' if row['java'] == 21 else '26.1'},)"
 ordering="NONE"
 side="CLIENT"
 [[dependencies.mcdr_singleplayer]]
@@ -82,6 +82,7 @@ def adapt_java(text, name, row, loader):
     if parts < (26, 2):
         text = text.replace('client.gui.setScreen(', 'client.setScreen(')
         text = text.replace('getInstance().gui.setScreen(', 'getInstance().setScreen(')
+        text = text.replace('.gui.screen()', '.screen')
     if not late:
         text = text.replace('.dimension().identifier()', '.dimension().location()')
     if not extracted:
@@ -89,8 +90,13 @@ def adapt_java(text, name, row, loader):
             text = text.replace('net.minecraft.util.Util', 'net.minecraft.Util')
         text = text.replace('client.gui.setScreen(', 'client.setScreen(')
         text = text.replace('getInstance().gui.setScreen(', 'getInstance().setScreen(')
-        if name == 'RestoreTitleScreenMixin.java':
+        if name in ('RestoreTitleScreenMixin.java', 'PythonSetupScreen.java', 'McdrInstallNoticeScreen.java'):
             text = text.replace('GuiGraphicsExtractor', 'GuiGraphics').replace('extractRenderState', 'render')
+            text = text.replace('graphics.centeredText', 'graphics.drawCenteredString')
+        if name == 'PythonSetupScreen.java':
+            # Older Screen APIs do not expose clickUrlAction; keep vanilla link confirmation.
+            text = text.replace('clickUrlAction(Minecraft.getInstance(), Minecraft.getInstance().screen, URI.create(url))',
+                                'net.minecraft.client.gui.screens.ConfirmLinkScreen.confirmLinkNow(Minecraft.getInstance().screen, URI.create(url))')
         if name == 'RestoreTitleOverlay.java':
             text = legacy_overlay(text, game)
     if name == 'SingleplayerBridge.java':

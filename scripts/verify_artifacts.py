@@ -45,9 +45,12 @@ def verify(loader, family):
             assert set(metadata['depends']['minecraft']) == set(variants)
             assert metadata['version'] == matrix['modVersion']
             assert metadata['environment'] == 'client'
+            assert metadata['depends']['fabricloader'] == '>=' + matrix['fabricLoaderMinimum']
         else:
             metadata = tomllib.loads(jar.read('META-INF/neoforge.mods.toml').decode())
             assert metadata['mods'][0]['version'] == matrix['modVersion']
+            loader_dep = next(d for d in metadata['dependencies']['mcdr_singleplayer'] if d['modId'] == 'neoforge')
+            assert loader_dep['versionRange'] == ('[21.0,)' if family == '1.21.x' else '[26.1,)')
             dep = next(d for d in metadata['dependencies']['mcdr_singleplayer'] if d['modId'] == 'minecraft')
             assert dep['versionRange'] == ','.join('[' + r['minecraft'] + ']' for r in rows)
     expected_hash = path.with_suffix('.sha256').read_text().split()[0]

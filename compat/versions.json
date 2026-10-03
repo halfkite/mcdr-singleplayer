@@ -1,6 +1,7 @@
 {
   "modVersion": "0.4.0",
   "fabricLoader": "0.19.5",
+  "fabricLoaderMinimum": "0.15.11",
   "curseforgeProjectId": 1723660,
   "versions": [
     {"minecraft": "1.21", "family": "1.21.x", "java": 21, "fabricApi": "0.102.0+1.21", "neoforge": "21.0.167"},

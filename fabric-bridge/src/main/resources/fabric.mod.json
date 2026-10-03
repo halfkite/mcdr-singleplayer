@@ -13,7 +13,7 @@
     "main": ["io.github.mcdrsingleplayer.SingleplayerBridge"]
   },
   "depends": {
-    "fabricloader": ">=0.19.5",
+    "fabricloader": ">=0.15.11",
     "minecraft": "26.3",
     "java": ">=25",
     "fabric-api": ">=0.161.0"

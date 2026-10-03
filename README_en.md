@@ -21,8 +21,8 @@ Supports Fabric and NeoForge on Minecraft 1.21–26.3.
 
 | Loader / dependency | Requirement |
 | --- | --- |
-| [Fabric Loader](https://fabricmc.net/use/installer/) | 0.19.5 or later; also install the [Fabric API](https://modrinth.com/mod/fabric-api) matching your Minecraft version |
-| [NeoForge](https://neoforged.net/) | Install NeoForge for your Minecraft version |
+| [Fabric Loader](https://fabricmc.net/use/installer/) | This mod requires 0.15.11 or later; also install the [Fabric API](https://modrinth.com/mod/fabric-api) matching your Minecraft version and meet its higher Loader requirement if applicable |
+| [NeoForge](https://neoforged.net/) | Declared minimum: 21.0+ for 1.21.x, 26.1+ for 26.x; install NeoForge matching your Minecraft version |
 | [MCDR](https://mcdreforged.com/) | After Python is installed, the mod installs MCDR automatically |
 | Python | Python 3.10 or later and pip |
 

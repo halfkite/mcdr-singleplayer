@@ -25,15 +25,20 @@ def archive(artifact, label, command):
                     '--mod-name', 'mcdr-singleplayer', '--game-version', label, '--build-command', command], check=True)
 
 
+def variant_artifact(loader, game):
+    artifact = ROOT / 'build/matrix' / loader / game / 'build/libs' / f'mcdr-singleplayer-{VERSION}+{loader}+mc{game}.jar'
+    if not artifact.is_file():
+        raise RuntimeError('Missing compiled adapter for current version: ' + str(artifact))
+    return artifact
+
+
 def compile_variant(loader, row):
     from generate_compat import generate
     project = generate(loader, row)
     gradle = ROOT / 'fabric-bridge' / ('gradlew.bat' if os.name == 'nt' else 'gradlew')
     command = [str(gradle), '-p', str(project), 'build', '--console=plain']
     subprocess.run(command, cwd=ROOT, check=True)
-    jars = [p for p in (project / 'build/libs').glob('*.jar') if not p.name.endswith(('-sources.jar', '-dev.jar'))]
-    assert len(jars) == 1, jars
-    artifact = jars[0]
+    artifact = variant_artifact(loader, row['minecraft'])
     archive(artifact, row['minecraft'] + ' ' + loader, ' '.join(command))
     return artifact
 
@@ -43,11 +48,7 @@ def merge(loader, family, rows):
     output.parent.mkdir(parents=True, exist_ok=True)
     contents = {}
     for row in rows:
-        project = ROOT / 'build/matrix' / loader / row['minecraft']
-        jars = [p for p in (project / 'build/libs').glob('*.jar') if not p.name.endswith(('-sources.jar', '-dev.jar'))]
-        if len(jars) != 1:
-            raise RuntimeError('Missing compiled adapter: ' + str(project))
-        with ZipFile(jars[0]) as jar:
+        with ZipFile(variant_artifact(loader, row['minecraft'])) as jar:
             for name in jar.namelist():
                 if name.endswith('/') or name in ('fabric.mod.json', 'META-INF/neoforge.mods.toml', 'mcdr-variants.json', 'META-INF/MANIFEST.MF', 'mcdr-family.mixins.json'):
                     continue

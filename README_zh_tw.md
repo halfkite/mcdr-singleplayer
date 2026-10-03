@@ -21,8 +21,8 @@ MCDR 是用來控制 Minecraft 伺服器的 Python 工具，詳見 [MCDReforged]
 
 | 載入器／依賴 | 要求 |
 | --- | --- |
-| [Fabric Loader](https://fabricmc.net/use/installer/) | 0.19.5 或更新版本；另需安裝與 Minecraft 版本相符的 [Fabric API](https://modrinth.com/mod/fabric-api) |
-| [NeoForge](https://neoforged.net/) | 安裝與 Minecraft 版本相符的 NeoForge |
+| [Fabric Loader](https://fabricmc.net/use/installer/) | 本模組最低要求 0.15.11 或更新版本；另需安裝與 Minecraft 版本相符的 [Fabric API](https://modrinth.com/mod/fabric-api)，若 Fabric API 要求更高版本則以其要求為準 |
+| [NeoForge](https://neoforged.net/) | 1.21.x 宣告最低 21.0+，26.x 宣告最低 26.1+；需安裝與目標 Minecraft 版本相符的 NeoForge |
 | [MCDR](https://mcdreforged.com/zh-CN/) | 安裝 Python 後，模組會自動安裝 MCDR |
 | Python | Python 3.10 或更新版本及 pip |
 

@@ -1,0 +1,73 @@
+name: Build mcdr-singleplayer
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**/*.md', LICENSE]
+  pull_request:
+    branches: [main]
+    paths-ignore: ['**/*.md', LICENSE]
+permissions:
+  contents: read
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Run Python and Java tests
+        run: |
+          python -m pip install -r requirements-dev.txt -r requirements-prime-backup.txt
+          python scripts/prepare_test_plugins.py
+          python -m pytest -q
+          chmod +x fabric-bridge/gradlew
+          fabric-bridge/gradlew -p fabric-bridge test --console=plain
+  build:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        loader: [fabric, neoforge]
+        family: [1.21.x, 26.x]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Keep Java 21 toolchain location
+        run: echo "MCDR_JAVA_INSTALLATIONS=$JAVA_HOME" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build and verify loader family
+        env:
+          MOD_LOADER: ${{ matrix.loader }}
+          MOD_FAMILY: ${{ matrix.family }}
+        run: |
+          chmod +x fabric-bridge/gradlew
+          python scripts/build_matrix.py --loader "$MOD_LOADER" --family "$MOD_FAMILY"
+          python scripts/verify_artifacts.py --loader "$MOD_LOADER" --family "$MOD_FAMILY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcdr-singleplayer-${{ matrix.loader }}-${{ matrix.family }}
+          path: |
+            dist/*.jar
+            dist/*.sha256
