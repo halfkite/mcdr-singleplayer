@@ -239,20 +239,20 @@ final class BridgeEndpoint implements AutoCloseable {
                 long deadline = integer(record, "deadline");
                 Request request = new Request(peer, id, command, deadline);
                 if (!session.equals(requestSession)) {
-                    request.complete(false, "Command rejected: stale world session");
+                    request.complete(false, net.minecraft.network.chat.Component.translatable("mcdr-singleplayer.error.command_rejected_stale_world_session").getString());
                 } else if (deadline < System.currentTimeMillis() || deadline > System.currentTimeMillis() + 15000) {
-                    request.complete(false, "Command rejected: expired or invalid deadline");
+                    request.complete(false, net.minecraft.network.chat.Component.translatable("mcdr-singleplayer.error.command_rejected_expired_or_invalid_deadline").getString());
                 } else if (paused && !SAVE_AND_QUIT.equals(command)) {
-                    request.complete(false, "Command rejected: world paused");
+                    request.complete(false, net.minecraft.network.chat.Component.translatable("mcdr-singleplayer.error.command_rejected_world_paused").getString());
                 } else if (peer.pending.incrementAndGet() > 64) {
                     peer.pending.decrementAndGet();
-                    request.complete(false, "Command rejected: queue full");
+                    request.complete(false, net.minecraft.network.chat.Component.translatable("mcdr-singleplayer.error.command_rejected_queue_full").getString());
                 } else {
                     request.counted = true;
                     try {
                         commands.accept(request);
                     } catch (RuntimeException e) {
-                        request.complete(false, "Command could not be scheduled");
+                        request.complete(false, net.minecraft.network.chat.Component.translatable("mcdr-singleplayer.error.command_could_not_be_scheduled").getString());
                     }
                 }
             }

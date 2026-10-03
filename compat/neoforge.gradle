@@ -1,0 +1,34 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.147'
+}
+version = '@VERSION@+neoforge+mc@GAME@'
+group = 'io.github.mcdrsingleplayer'
+java.toolchain.languageVersion = JavaLanguageVersion.of(@JAVA@)
+tasks.withType(JavaCompile).configureEach { options.release = @JAVA@ }
+neoForge {
+    enable { version = '@NEOFORGE@'; disableRecompilation = true }
+    runs {
+        client { client(); gameDirectory = layout.buildDirectory.dir('run-client').get().asFile }
+    }
+    mods { mcdr_singleplayer { sourceSet(sourceSets.main) } }
+}
+tasks.register('bundleInstaller', Zip) {
+    archiveFileName = 'mcdr-install.zip'
+    destinationDirectory = layout.buildDirectory.dir('installer')
+    from('@ROOT@/python') { into 'runtime'; exclude '**/__pycache__/**', '**/*.pyc', 'mcdreforged.plugin.json', '.gitignore' }
+    from('@ROOT@/python/bridge_bootstrap.py')
+    from('@ROOT@/python') { into 'bridge-plugin'; exclude '**/__pycache__/**', '**/*.pyc', 'bridge_*.py', '.gitignore' }
+    from('@ROOT@/prime-backup-adapter') { into 'adapter-plugin'; exclude '**/__pycache__/**', '**/*.pyc' }
+    from('@ROOT@/chunk-backup-adapter') { into 'chunk-adapter-plugin'; exclude '**/__pycache__/**', '**/*.pyc' }
+    from('@ROOT@/requirements-prime-backup.txt')
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+processResources {
+    dependsOn 'bundleInstaller'
+    from(tasks.named('bundleInstaller').flatMap { it.archiveFile })
+    from('@ROOT@/python/singleplayer_bridge/lang') { into 'assets/mcdr-singleplayer/lang' }
+    from('@ROOT@/fabric-bridge/src/main/resources/assets/mcdr-singleplayer/icon.png') { into 'assets/mcdr-singleplayer' }
+}
+jar { from('@ROOT@/LICENSE') }

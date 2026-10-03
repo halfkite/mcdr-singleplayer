@@ -19,7 +19,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Mod build archive failed' }
     & $PythonPath 'scripts/package_release.py'
     if ($LASTEXITCODE -ne 0) { throw 'Release packaging failed' }
-    & $PythonPath $ArchiveScript --artifact "dist/singleplayer_bridge-$taskVersion.mcdr" --artifact "dist/singleplayer_prime_backup-$taskVersion.mcdr" --artifact "dist/mcdr-singleplayer-$taskVersion-mc26.3-fabric.zip" --output-root 'mod-builds' --mod-name 'mcdr-singleplayer release bundle' --game-version '26.3 Fabric' --build-command 'python -m mcdreforged pack; python scripts/package_release.py'
+    & $PythonPath $ArchiveScript --artifact "dist/singleplayer_bridge-$taskVersion.mcdr" --artifact "dist/singleplayer_prime_backup-$taskVersion.mcdr" --artifact "dist/singleplayer_chunk_backup-$taskVersion.mcdr" --artifact "dist/mcdr-singleplayer-$taskVersion-mc26.3-fabric.zip" --output-root 'mod-builds' --mod-name 'mcdr-singleplayer release bundle' --game-version '26.3 Fabric' --build-command 'python -m mcdreforged pack; python scripts/package_release.py'
     if ($LASTEXITCODE -ne 0) { throw 'Release archive failed' }
 } finally {
     Pop-Location

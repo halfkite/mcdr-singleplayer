@@ -46,7 +46,7 @@ def main():
     from singleplayer_bridge.layout import migrate_legacy
     common.mkdir(parents=True, exist_ok=True)
     migrate_legacy(common)
-    config_dir, data_dir, log_dir, runtime_root = (common / name for name in ('runtime/config', 'date', 'log', 'runtime'))
+    config_dir, data_dir, log_dir, runtime_root = common, common / 'date', common / 'log', common / 'runtime'
     for directory in (config_dir, data_dir, log_dir, runtime_root):
         directory.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.mcdr-init-', dir=runtime_root) as temporary:

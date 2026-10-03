@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from singleplayer_bridge.layout import migrate_legacy, organize_layout
+from singleplayer_bridge.layout import migrate_legacy, organize_layout, migrate_profile_data
 from singleplayer_bridge.profiles import ensure_profile, profile_path, read_json, write_json
 from singleplayer_bridge.supervisor import lock_common
 
@@ -49,10 +49,10 @@ def test_034_layout_is_grouped_and_default_config_backups_are_removed(tmp_path):
 
     organize_layout(common)
 
-    assert {path.name for path in common.iterdir()} == {'date', 'log', 'runtime'}
-    assert (common / 'runtime/config/config.json').read_text() == '{"enabled":true}'
-    assert (common / 'runtime/config/config.yml').is_file()
-    assert (common / 'runtime/config/plugins/probe.py').read_text() == 'plugin'
+    assert {'date', 'log', 'runtime', 'config.yml', 'plugins'} <= {path.name for path in common.iterdir()}
+    assert (common / 'config.json').read_text() == '{"enabled":true}'
+    assert (common / 'config.yml').is_file()
+    assert (common / 'plugins/probe.py').read_text() == 'plugin'
     assert (common / 'runtime/bootstrap-resources-0.3.4/bridge_bootstrap.py').is_file()
     assert (common / 'date/World/profile.json').is_file()
     assert (common / 'log/controller.log').read_text() == 'log'
@@ -65,18 +65,18 @@ def test_migration_preserves_database_policies_sources_and_rebinds_storage(tmp_p
     profile = ensure_profile(common, world)
     assert profile == common / 'date' / world.name
     config = read_json(profile / 'config/prime_backup/config.json')
-    assert config['storage_root'] == str(profile / 'data/prime_backup')
+    assert config['storage_root'] == './pb_files'
     assert config['enabled'] is False
     assert config['scheduled_backup']['interval'] == '2h'
-    with sqlite3.connect(profile / 'data/prime_backup/backup.db') as db:
+    with sqlite3.connect(profile / 'pb_files/backup.db') as db:
         assert db.execute('SELECT * FROM backup').fetchall() == [(7, 'existing backup')]
-    assert (profile / 'data/prime_backup/blob').read_bytes() == b'backup-pool-content'
+    assert (profile / 'pb_files/blob').read_bytes() == b'backup-pool-content'
     assert read_json(old / 'config/prime_backup/config.json')['storage_root'] == str(old / 'data/prime_backup')
-    assert (old / 'data/prime_backup/backup.db').read_bytes() == (profile / 'data/prime_backup/backup.db').read_bytes()
-    assert (common / 'runtime/config/config.yml').read_text() == (source / 'config.yml').read_text()
-    assert (common / 'runtime/config/plugins/probe.py').read_bytes() == (source / 'plugins/probe.py').read_bytes()
+    assert (old / 'data/prime_backup/backup.db').read_bytes() == (profile / 'pb_files/backup.db').read_bytes()
+    assert (common / 'config.yml').read_text() == (source / 'config.yml').read_text()
+    assert (common / 'plugins/probe.py').read_bytes() == (source / 'plugins/probe.py').read_bytes()
     assert read_json(common / 'runtime/.legacy-layout.json')['completed']
-    assert {path.name for path in common.iterdir()} == {'date', 'log', 'runtime'}
+    assert {'date', 'log', 'runtime', 'config.yml', 'plugins'} <= {path.name for path in common.iterdir()}
     assert (world / 'level.dat').read_bytes() == b'untouched-world'
     migrate_legacy(common)
     assert not list((profile / 'config/prime_backup').glob('config.json.before-*'))
@@ -92,7 +92,7 @@ def test_migration_does_not_overwrite_existing_profile_or_common_settings(tmp_pa
         migrate_legacy(common)
     assert (destination / 'keep').read_text() == 'existing-data'
     assert not (destination / 'profile.json').exists()
-    assert (common / 'runtime/config/config.yml').read_text() == 'new-config'
+    assert (common / 'config.yml').read_text() == 'new-config'
     assert not read_json(common / 'runtime/.legacy-layout.json').get('completed')
 
 
@@ -102,7 +102,7 @@ def test_live_legacy_controller_blocks_import(tmp_path):
     try:
         with pytest.raises(OSError):
             migrate_legacy(common)
-        assert not (common / 'runtime/config/config.yml').exists()
+        assert not (common / 'config.yml').exists()
     finally:
         lock.close()
     migrate_legacy(common)
@@ -115,7 +115,68 @@ def test_interrupted_migration_resumes_only_its_committed_profiles(tmp_path):
     write_json(common / 'runtime/.legacy-layout.json', marker)
     migrate_legacy(common)
     assert read_json(common / 'runtime/.legacy-layout.json')['completed']
-    assert (common / 'date' / world.name / 'data/prime_backup/blob').read_bytes() == b'backup-pool-content'
+    assert (common / 'date' / world.name / 'pb_files/blob').read_bytes() == b'backup-pool-content'
+
+
+def test_036_shared_files_and_backup_store_move_without_changing_database(tmp_path):
+    import hashlib
+    common, _, _, world = fixture(tmp_path)
+    (common / 'runtime/.legacy-layout.json').unlink()
+    config = common / 'runtime/config'
+    write_json(config / 'config.json', {'token': 'a' * 64, 'port': 25591})
+    (config / 'config.yml').write_text('user configuration')
+    (config / 'permission.yml').write_text('owner permissions')
+    (config / 'plugins').mkdir()
+    (config / 'plugins/plugin.mcdr').write_bytes(b'plugin')
+    profile = ensure_profile(common, world)
+    store = profile / 'data/prime_backup'
+    store.mkdir(parents=True)
+    with sqlite3.connect(store / 'prime_backup.db') as db:
+        db.execute('CREATE TABLE backups(id INTEGER)')
+        db.execute('INSERT INTO backups VALUES(9)')
+    db.close()
+    (store / 'pool').write_bytes(b'backup-pool')
+    prime = read_json(profile / 'config/prime_backup/config.json')
+    prime['storage_root'] = str(store)
+    write_json(profile / 'config/prime_backup/config.json', prime)
+    digest = hashlib.sha256((store / 'prime_backup.db').read_bytes()).hexdigest()
+    migrate_legacy(common)
+    assert not config.exists() and not (profile / 'data').exists()
+    assert read_json(common / 'config.json')['token'] == 'a' * 64
+    assert (common / 'permission.yml').read_text() == 'owner permissions'
+    assert (common / 'plugins/plugin.mcdr').read_bytes() == b'plugin'
+    assert hashlib.sha256((profile / 'pb_files/prime_backup.db').read_bytes()).hexdigest() == digest
+    with sqlite3.connect(profile / 'pb_files/prime_backup.db') as db:
+        assert db.execute('SELECT id FROM backups').fetchone() == (9,)
+    assert read_json(profile / 'config/prime_backup/config.json')['storage_root'] == './pb_files'
+    migrate_legacy(common)
+    assert (profile / 'pb_files/pool').read_bytes() == b'backup-pool'
+
+
+def test_backup_store_collision_is_rejected_without_merging_files(tmp_path):
+    profile = tmp_path / 'date/world'
+    old = profile / 'data/prime_backup'; old.mkdir(parents=True)
+    native = profile / 'pb_files'; native.mkdir()
+    (old / 'db').write_bytes(b'old-store')
+    (native / 'db').write_bytes(b'native-store')
+    with pytest.raises(ValueError, match='cannot be merged'):
+        migrate_profile_data(profile)
+    assert (old / 'db').read_bytes() == b'old-store'
+    assert (native / 'db').read_bytes() == b'native-store'
+
+
+def test_running_current_controller_blocks_shared_file_migration(tmp_path):
+    common = tmp_path / 'mcdr-singleplayer'
+    (common / 'runtime/config').mkdir(parents=True)
+    (common / 'runtime/config/config.yml').write_text('in use')
+    lease = lock_common(common)
+    try:
+        with pytest.raises(OSError):
+            migrate_legacy(common)
+        assert (common / 'runtime/config/config.yml').read_text() == 'in use'
+        assert not (common / 'config.yml').exists()
+    finally:
+        lease.close()
 
 
 @pytest.mark.parametrize('name', ['plugins', 'runtime', 'log', 'config'])

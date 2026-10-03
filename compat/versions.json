@@ -1,0 +1,24 @@
+{
+  "modVersion": "0.3.10",
+  "fabricLoader": "0.19.5",
+  "curseforgeProjectId": 1723660,
+  "versions": [
+    {"minecraft": "1.21", "family": "1.21.x", "java": 21, "fabricApi": "0.102.0+1.21", "neoforge": "21.0.167"},
+    {"minecraft": "1.21.1", "family": "1.21.x", "java": 21, "fabricApi": "0.116.17+1.21.1", "neoforge": "21.1.235"},
+    {"minecraft": "1.21.2", "family": "1.21.x", "java": 21, "fabricApi": "0.106.1+1.21.2", "neoforge": "21.2.1-beta"},
+    {"minecraft": "1.21.3", "family": "1.21.x", "java": 21, "fabricApi": "0.114.1+1.21.3", "neoforge": "21.3.97"},
+    {"minecraft": "1.21.4", "family": "1.21.x", "java": 21, "fabricApi": "0.119.4+1.21.4", "neoforge": "21.4.157"},
+    {"minecraft": "1.21.5", "family": "1.21.x", "java": 21, "fabricApi": "0.128.2+1.21.5", "neoforge": "21.5.98"},
+    {"minecraft": "1.21.6", "family": "1.21.x", "java": 21, "fabricApi": "0.128.2+1.21.6", "neoforge": "21.6.20-beta"},
+    {"minecraft": "1.21.7", "family": "1.21.x", "java": 21, "fabricApi": "0.129.0+1.21.7", "neoforge": "21.7.25-beta"},
+    {"minecraft": "1.21.8", "family": "1.21.x", "java": 21, "fabricApi": "0.136.1+1.21.8", "neoforge": "21.8.54"},
+    {"minecraft": "1.21.9", "family": "1.21.x", "java": 21, "fabricApi": "0.134.1+1.21.9", "neoforge": "21.9.16-beta"},
+    {"minecraft": "1.21.10", "family": "1.21.x", "java": 21, "fabricApi": "0.138.4+1.21.10", "neoforge": "21.10.64"},
+    {"minecraft": "1.21.11", "family": "1.21.x", "java": 21, "fabricApi": "0.141.6+1.21.11", "neoforge": "21.11.44"},
+    {"minecraft": "26.1", "family": "26.x", "java": 25, "fabricApi": "0.145.1+26.1", "neoforge": "26.1.0.19-beta"},
+    {"minecraft": "26.1.1", "family": "26.x", "java": 25, "fabricApi": "0.145.4+26.1.1", "neoforge": "26.1.1.15-beta"},
+    {"minecraft": "26.1.2", "family": "26.x", "java": 25, "fabricApi": "0.155.3+26.1.2", "neoforge": "26.1.2.94"},
+    {"minecraft": "26.2", "family": "26.x", "java": 25, "fabricApi": "0.161.0+26.2", "neoforge": "26.2.0.41-beta"},
+    {"minecraft": "26.3", "family": "26.x", "java": 25, "fabricApi": "0.161.0+26.3", "neoforge": "26.3.0.1-beta"}
+  ]
+}

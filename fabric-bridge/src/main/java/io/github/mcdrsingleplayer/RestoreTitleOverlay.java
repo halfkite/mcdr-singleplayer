@@ -44,32 +44,24 @@ final class RestoreTitleOverlay {
             ScreenEvents.afterExtract(screen).register((ignored, graphics, mouseX, mouseY, ticks) -> {
                 var value = monitor.visible();
                 if (value == null) return;
-                boolean zh = client.getLanguageManager().getSelected().startsWith("zh_");
                 int textWidth = Math.min(310, width - 48);
                 // Match vanilla loading screens, including resource pack textures.
                 graphics.nextStratum();
                 background.extractBackground(graphics, mouseX, mouseY, ticks);
                 graphics.nextStratum();
                 var font = screen.getFont();
-                String title = switch (value.status()) {
-                    case "completed" -> zh ? "回档完成" : "Restore complete";
-                    case "failed" -> zh ? "回档失败" : "Restore failed";
-                    case "cancelled" -> zh ? "回档已取消" : "Restore cancelled";
-                    default -> zh ? "正在回档" : "Restoring world";
-                };
+                var title = Component.translatable("mcdr-singleplayer.restore.title." + switch (value.status()) {
+                    case "completed", "failed", "cancelled" -> value.status();
+                    default -> "running";
+                });
                 graphics.centeredText(font, title, width / 2, top, 0xffffffff);
                 graphics.centeredText(font, font.plainSubstrByWidth(value.world() + (value.backup() > 0 ? "  (#" + value.backup() + ")" : ""), textWidth), width / 2, top + 20, 0xffa0a0a0);
-                String stage = switch (value.stage()) {
-                    case "checking" -> zh ? "正在检查备份 / 等待确认" : "Checking backup / waiting for confirmation";
-                    case "saving" -> zh ? "正在保存并退出世界" : "Saving and closing the world";
-                    case "safety_backup" -> zh ? "正在创建回档前安全备份" : "Creating the pre-restore safety backup";
-                    case "restoring" -> zh ? "正在恢复存档并校验文件" : "Restoring and verifying world files";
-                    case "completed" -> zh ? "可以重新进入存档" : "You can enter the world.";
-                    case "cancelled" -> zh ? "回档已取消或未确认" : "Restore cancelled or not confirmed";
-                    default -> zh ? "回档失败，请检查日志" : "Restore failed. Check the logs.";
-                };
+                var stage = Component.translatable("mcdr-singleplayer.restore.stage." + switch (value.stage()) {
+                    case "checking", "saving", "safety_backup", "restoring", "rolling_back", "player_data", "completed", "cancelled" -> value.stage();
+                    default -> "failed";
+                });
                 int stageY = top + 42;
-                for (var line : font.split(Component.literal(stage), textWidth)) {
+                for (var line : font.split(stage, textWidth)) {
                     if (stageY > top + 52) break;
                     graphics.centeredText(font, line, width / 2, stageY, 0xffffffff);
                     stageY += 10;
@@ -77,18 +69,19 @@ final class RestoreTitleOverlay {
                 if (value.running()) {
                     graphics.centeredText(font, LoadingDotsText.get(Util.getMillis()), width / 2, top + 68, 0xff808080);
                 }
-                String detail = value.detail();
-                if (detail.isEmpty()) detail = value.running()
-                    ? (zh ? "请等待回档结束；目标存档暂时锁定" : "Please wait. The target world is locked.")
-                    : value.status().equals("completed") ? (zh ? "返回主菜单后手动进入原存档" : "Return to the menu and open the restored world.")
-                    : value.modified() ? (zh ? "目标存档仍锁定，需要离线重新回档" : "World stays locked. Retry the restore offline.") : "";
+                Component detail = value.detail().startsWith("mcdr-singleplayer.")
+                    ? Component.translatable(value.detail()) : Component.literal(value.detail());
+                if (value.detail().isEmpty()) detail = value.running()
+                    ? Component.translatable("mcdr-singleplayer.restore.detail.running")
+                    : value.status().equals("completed") ? Component.translatable("mcdr-singleplayer.restore.detail.completed")
+                    : value.modified() ? Component.translatable("mcdr-singleplayer.restore.detail.locked") : Component.empty();
                 int lineY = top + 90;
-                for (var line : font.split(Component.literal(detail), textWidth)) {
+                for (var line : font.split(detail, textWidth)) {
                     if (lineY > top + 100) break;
                     graphics.centeredText(font, line, width / 2, lineY, 0xffa0a0a0);
                     lineY += 10;
                 }
-                dismiss.setMessage(Component.literal(value.running() ? (zh ? "正在回档…" : "Restoring…") : (zh ? "返回主菜单" : "Return to menu")));
+                dismiss.setMessage(Component.translatable(value.running() ? "mcdr-singleplayer.restore.button.running" : "mcdr-singleplayer.restore.button.menu"));
                 graphics.nextStratum();
                 dismiss.extractRenderState(graphics, mouseX, mouseY, ticks);
             });

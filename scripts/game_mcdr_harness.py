@@ -37,7 +37,7 @@ def on_load(server, prev):
     config = yaml.load((work / 'config.yml').read_text(encoding='utf8'))
     config.update(language='en_us', advanced_console=False, working_directory=str(work), encoding='utf8', decoding='utf8')
     config['start_command'] = [sys.executable, str(root / 'python' / 'bridge_proxy.py'), '--config',
-                               str(args.game_dir / 'mcdr-singleplayer' / 'runtime/config/config.json')]
+                               str(args.game_dir / 'mcdr-singleplayer' / 'config.json')]
     with (work / 'config.yml').open('w', encoding='utf8') as output:
         yaml.dump(config, output)
     permissions = yaml.load((work / 'permission.yml').read_text(encoding='utf8'))

@@ -88,7 +88,7 @@ final class AutoRuntime {
         Thread.ofVirtual().name("mcdr-auto-install").start(() -> {
             try {
                 Files.createDirectories(common);
-                Path resources = common.resolve("runtime/bootstrap-resources-0.3.5");
+                Path resources = common.resolve("runtime/bootstrap-resources-0.3.10");
                 extract(resources);
                 String python = python();
                 List<String> command;

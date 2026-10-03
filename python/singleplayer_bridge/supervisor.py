@@ -16,7 +16,7 @@ def configure_host(common, player, language):
     from ruamel.yaml import YAML
     yaml = YAML()
     for filename in ('permission.yml', 'config.yml'):
-        path = Path(common) / 'runtime/config' / filename
+        path = Path(common) / filename
         with path.open(encoding='utf8') as stream:
             config = yaml.load(stream)
         changed = False
@@ -92,7 +92,7 @@ class Controller:
                 environment = dict(os.environ, PYTHONUTF8='1', MCDR_BRIDGE_COMMON=str(self.common),
                                    MCDR_BRIDGE_CONFIG=str(self.game_config), MCDR_BRIDGE_WORLD_PATH=state['world_path'],
                                    MCDR_BRIDGE_SESSION=desired, MCDR_BRIDGE_HOST=player,
-                                   MCDR_BRIDGE_LANGUAGE=language)
+                                   MCDR_BRIDGE_LANGUAGE=language, MCDR_BRIDGE_CLIENT_ID=self.client_id)
                 world_log = self.common / 'log' / profile.name
                 world_log.mkdir(parents=True, exist_ok=True)
                 self.output = (world_log / 'controller-child.log').open('a', encoding='utf8')
@@ -102,7 +102,7 @@ class Controller:
                     'core_constant.LOGGING_FILE=os.path.join(os.environ["MCDR_BRIDGE_LOG_DIR"], "MCDR.log"); '
                     'from mcdreforged import mcdr_entrypoint; mcdr_entrypoint.entrypoint()')
                 self.process = subprocess.Popen([self.python, '-c', mcdr_entrypoint, 'start',
-                    '--config', str(self.common / 'runtime/config/config.yml'), '--permission', str(self.common / 'runtime/config/permission.yml')],
+                    '--config', str(self.common / 'config.yml'), '--permission', str(self.common / 'permission.yml')],
                     cwd=profile, env=environment, stdin=subprocess.PIPE, stdout=self.output,
                     stderr=subprocess.STDOUT, text=True, encoding='utf8',
                     creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))

@@ -1,6 +1,7 @@
-"""Read/export a migrated real 0.3.3 PB database in an isolated 0.3.5 game layout."""
+"""Read/export a migrated real 0.3.3 PB database in an isolated 0.3.10 game layout."""
 import hashlib
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -22,7 +23,7 @@ def main():
     reference = ROOT / '.reference/auto-0.3.3-r2/worlds/New World (4)'
     original_db = reference / 'data/prime_backup/prime_backup.db'
     before = hashlib.sha256(original_db.read_bytes()).hexdigest()
-    base = Path(tempfile.mkdtemp(prefix='migration-0.3.5-', dir=ROOT / '.reference'))
+    base = Path(tempfile.mkdtemp(prefix='migration-0.3.10-', dir=ROOT / '.reference'))
     game = base / 'game'
     world = game / 'saves' / reference.name
     world.mkdir(parents=True)
@@ -41,11 +42,12 @@ def main():
     profile = ensure_profile(common, world, 'zh_cn')
     assert profile == common / 'date' / world.name
     config = read_json(profile / 'config/prime_backup/config.json')
+    os.chdir(profile)
     set_config_instance(Config.deserialize(config))
     DbAccess.init(create=False, migrate=False)
     try:
         backup = GetBackupAction(1, with_files=True).run()
-        output = profile / 'data/prime_backup/migrated-test.zip'
+        output = profile / 'pb_files/migrated-test.zip'
         failures = ExportBackupToZipAction(1, output, verify_blob=True).run()
         assert len(failures) == 0
         with zipfile.ZipFile(output) as archive:
@@ -61,7 +63,7 @@ def main():
     result = {'result': 'passed', 'source': str(reference), 'profile': str(profile), 'backup_id': 1,
         'comment': backup.comment, 'exported_entries': files, 'source_database_sha256': before,
         'verified_blob_export': True, 'source_preserved': True}
-    (ROOT / 'docs/assets/automatic-0.3.5-migration.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf8')
+    (ROOT / 'docs/assets/automatic-0.3.10-migration.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf8')
     print(json.dumps(result, ensure_ascii=True, indent=2))
 
 

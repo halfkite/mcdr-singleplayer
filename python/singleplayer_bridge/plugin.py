@@ -1,3 +1,4 @@
+from singleplayer_bridge.i18n import tr
 import threading
 import json
 import uuid
@@ -19,9 +20,19 @@ _closed_cv = threading.Condition(_lock)
 _retiring = threading.Event()
 _publisher_stop = threading.Event()
 _prompted_sessions = set()
+_server = None
 
 
 def prime_busy():
+    from .onboarding import installing
+    if installing():
+        return True
+    # Both upstream queues remain busy after the game world has closed.
+    if _server is not None:
+        instance = _server.get_plugin_instance('chunk_backup')
+        manager = getattr(instance, 'task_manager', None)
+        if manager is not None and any(worker.task_queue.unfinished_size() for worker in (manager.worker_heavy, manager.worker_light)):
+            return True
     try:
         from prime_backup.mcdr import mcdr_entrypoint
         manager = mcdr_entrypoint.task_manager
@@ -36,7 +47,7 @@ def retire(source):
     _retiring.set()
     server = source.get_server()
     def finish():
-        # In particular, SERVER_STOPPED during PB restore does not mean the restore finished.
+        # SERVER_STOPPED during a PB/CB restore does not mean the file task finished.
         time.sleep(0.5)
         while prime_busy():
             time.sleep(0.1)
@@ -50,76 +61,64 @@ def retire(source):
 def profile_list(source):
     common = os.environ.get('MCDR_BRIDGE_COMMON')
     if not common:
-        source.reply('此功能需要游戏自动启动模式。')
+        source.reply(tr('command.auto_required'))
         return
     names = sorted(p.name for p in (Path(common) / 'date').iterdir() if p.is_dir() and not p.name.startswith('.') and (p / 'profile.json').is_file()) if (Path(common) / 'date').is_dir() else []
-    source.reply('存档配置：' + '，'.join(names))
+    source.reply(tr('command.profiles', ', '.join(names)))
 
 
 def profile_import(source, context, replace=False):
     common = os.environ.get('MCDR_BRIDGE_COMMON')
     if not common:
-        source.reply('此功能需要游戏自动启动模式。')
+        source.reply(tr('command.auto_required'))
         return
     if prime_busy():
-        source.reply('Prime Backup 正在执行任务，请完成后再导入。')
+        source.reply(tr('command.import_busy'))
         return
     from .profiles import import_configs
     try:
         copied = import_configs(common, Path.cwd(), context['world'], replace)
-        source.reply('已导入 {} 个配置文件；下次进入存档生效。原有文件{}。'.format(len(copied), '已备份后替换' if replace else '保留'))
+        source.reply(tr('command.imported', len(copied), tr('command.replaced' if replace else 'command.kept')))
     except (ValueError, OSError) as exc:
-        source.reply('导入失败：' + str(exc))
+        source.reply(tr('command.import_failed', str(exc)))
 
 
 def recommend_command(source):
     if not os.environ.get('MCDR_BRIDGE_COMMON'):
-        source.reply('此功能需要游戏自动启动模式。')
+        source.reply(tr('command.auto_required'))
         return
     if prime_busy():
-        source.reply('Prime Backup 正在执行任务，请完成后再配置。')
+        source.reply(tr('command.config_busy'))
+        return
+    if source.get_server().get_plugin_instance('singleplayer_prime_backup') is None:
+        source.reply(tr('command.prime_required'))
         return
     from .profiles import recommend
     recommend(Path.cwd(), language=os.environ.get('MCDR_BRIDGE_LANGUAGE', 'en_us'))
-    source.reply('已启用当前存档的 Prime Backup 推荐配置。正在重新加载插件。')
+    source.reply(tr('command.recommended'))
     source.get_server().reload_plugin('prime_backup')
     prompt_choices(source.get_server(), force=True)
 
 
 def choose_config(source, key, enabled):
     if not os.environ.get('MCDR_BRIDGE_COMMON'):
-        source.reply('此功能需要游戏自动启动模式。')
+        source.reply(tr('command.auto_required'))
         return
     if prime_busy():
-        source.reply('Prime Backup 正在执行任务，请完成后再次点击选项。')
+        source.reply(tr('command.choice_busy'))
+        return
+    if source.get_server().get_plugin_instance('singleplayer_prime_backup') is None:
+        source.reply(tr('command.prime_required'))
         return
     from .profiles import recommend
     recommend(Path.cwd(), **{key: enabled})
     source.get_server().reload_plugin('prime_backup')
-    source.reply({'auto_backup': '自动备份', 'auto_delete': '自动删除', 'backup_enabled': '备份'}[key] + ('已开启。' if enabled else '已关闭。'))
+    source.reply(tr('command.enabled' if enabled else 'command.disabled', tr('command.' + {'auto_backup': 'auto_backup', 'auto_delete': 'auto_delete', 'backup_enabled': 'backup'}[key])))
 
 
 def prompt_choices(server, force=False):
-    from .profiles import read_json
-    from mcdreforged.api.rtext import RText, RTextList, RAction, RColor
-    host = os.environ.get('MCDR_BRIDGE_HOST') or snapshot().get('host_player')
-    session = snapshot().get('session')
-    if not host or not session or host not in snapshot().get('players', []) or not os.environ.get('MCDR_BRIDGE_COMMON'):
-        return
-    if session in _prompted_sessions and not force:
-        return
-    path = Path('config/singleplayer_bridge/config.json')
-    config = read_json(path) if path.exists() else {}
-    chinese = os.environ.get('MCDR_BRIDGE_LANGUAGE', 'en_us').lower().startswith('zh_')
-    for key, question in [('backup_enabled', '是否开启备份？推荐配置默认已开启 Prime Backup。' if chinese else 'Enable backups? Prime Backup is enabled by default.'),
-                          ('auto_backup', '是否开启自动备份？开启后每 4 小时备份一次。' if chinese else 'Enable automatic backup every 4 hours?'),
-                          ('auto_delete', '是否开启自动删除？保留最近 40 份、每日 1 份保留 30 天、每周 1 份保留 30 周。' if chinese else 'Enable automatic pruning? Keep last 40, daily 30, weekly 30 backups.')]:
-        if key not in config or force:
-            command = 'backup' if key == 'backup_enabled' else key
-            message = RTextList(question, ' ', RText('[开启]' if chinese else '[Enable]', RColor.green).c(RAction.run_command, f'/!!spbridge config {command} on'),
-                ' ', RText('[关闭]' if chinese else '[Disable]', RColor.gray).c(RAction.run_command, f'/!!spbridge config {command} off'))
-            server.tell(host, message)
-    _prompted_sessions.add(session)
+    from .onboarding import prompt
+    prompt(server, force)
 
 
 def start_publisher(server):
@@ -162,7 +161,7 @@ def reset():
     with _lock:
         _state.clear()
         for waiting in _waiters.values():
-            waiting['error'] = 'Bridge connection stopped'
+            waiting['error'] = tr('error.bridge_connection_stopped')
             waiting['done'].set()
         _closed_cv.notify_all()
 
@@ -235,15 +234,15 @@ def execute_checked(server, command, timeout=12):
     waiting = {'done': threading.Event()}
     with _lock:
         if not _state.get('session'):
-            raise RuntimeError('No singleplayer world connected')
+            raise RuntimeError(tr('error.no_singleplayer_world_connected'))
         _waiters[request_id] = waiting
     try:
         server.execute(CHECKED_PREFIX + json.dumps({'id': request_id, 'command': command}, ensure_ascii=False))
         if not waiting['done'].wait(timeout):
-            raise RuntimeError('Game command acknowledgment timed out; no automatic replay')
+            raise RuntimeError(tr('error.game_command_acknowledgment_timed_out_no_automatic_replay'))
         result = waiting.get('result')
         if result is None:
-            raise RuntimeError(waiting.get('error', 'Bridge connection lost'))
+            raise RuntimeError(waiting.get('error', tr('error.bridge_connection_lost')))
         if not result['success']:
             raise RuntimeError(result['text'])
         return result
@@ -255,23 +254,23 @@ def execute_checked(server, command, timeout=12):
 def wait_world_closed(session, timeout=60):
     with _closed_cv:
         if not _closed_cv.wait_for(lambda: session in _closed_sessions or _state.get('session') != session, timeout):
-            raise RuntimeError('World shutdown timed out; restoration cancelled')
+            raise RuntimeError(tr('error.world_shutdown_timed_out_restoration_cancelled'))
         if session not in _closed_sessions:
-            raise RuntimeError('Bridge detached without confirming world shutdown; restoration cancelled')
+            raise RuntimeError(tr('error.bridge_detached_without_confirming_world_shutdown_restoration_cancelled'))
 
 
 def status(source):
     with _lock:
         state = dict(_state)
     if not state.get('session'):
-        source.reply('单人桥接：尚未连接世界。进入单人世界后连接；!!MCDR server start 可重新连接。')
+        source.reply(tr('command.no_world'))
     else:
-        source.reply('单人桥接：{}，Minecraft {}，存档 {}'.format(
-            '已暂停' if state.get('paused') else '已连接', state['game_version'], state['world_path']))
+        source.reply(tr('command.status', tr('command.paused' if state.get('paused') else 'command.connected'), state['game_version'], state['world_path']))
 
 
 def load(server, prev_module):
-    global _publisher_stop
+    global _publisher_stop, _server
+    _server = server
     previous = getattr(prev_module, 'plugin', None)
     if previous is not None and hasattr(previous, 'unload'):
         previous.unload()
@@ -284,7 +283,8 @@ def load(server, prev_module):
         _progress_context.clear()
         _progress_context.update(progress_context)
     server.register_server_handler(SingleplayerHandler())
-    server.register_help_message('!!spbridge', '查看单人世界桥接状态', permission=2)
+    server.register_help_message('!!spbridge', tr('command.help'), permission=2)
+    from .onboarding import dismiss, install
     server.register_command(
         Literal('!!spbridge').requires(lambda source: source.has_permission(2))
         .runs(status).then(Literal('status').runs(status))
@@ -300,10 +300,16 @@ def load(server, prev_module):
                 .then(Literal('off').runs(lambda source: choose_config(source, 'auto_backup', False))))
             .then(Literal('auto_delete').then(Literal('on').runs(lambda source: choose_config(source, 'auto_delete', True)))
                 .then(Literal('off').runs(lambda source: choose_config(source, 'auto_delete', False)))))
+        .then(Literal('onboarding').requires(lambda source: source.has_permission(3))
+            .then(Literal('show').runs(lambda source: prompt_choices(source.get_server(), force=True)))
+            .then(Literal('dismiss').runs(dismiss)))
+        .then(Literal('install').requires(lambda source: source.has_permission(4))
+            .then(Literal('prime_backup').runs(lambda source: install(source, 'prime_backup')))
+            .then(Literal('chunk_backup').runs(lambda source: install(source, 'chunk_backup'))))
         .then(Literal('internal').requires(lambda source: source.is_console)
             .then(Literal('retire').runs(retire)))
     )
     if server.is_server_running():
         server.set_exit_after_stop_flag(False)
-    server.logger.info('单人桥接已加载。MCDR 的 start/stop/kill 管理代理连接；不会关闭或重启游戏世界。')
+    server.logger.info(tr('command.loaded'))
     start_publisher(server)

@@ -1,4 +1,5 @@
 """Migrate older bridge layouts, then import legacy MCDR world profiles."""
+from singleplayer_bridge.i18n import tr
 import logging
 import shutil
 import time
@@ -11,11 +12,11 @@ from .profiles import linked, profile_path, read_json, write_json
 def checked_copy(source, target):
     source, target = Path(source), Path(target)
     if linked(source) or linked(target) or any(linked(parent) for parent in target.parents):
-        raise ValueError('Migration paths cannot be links')
+        raise ValueError(tr('error.migration_paths_cannot_be_links'))
     if source.is_dir():
         for item in source.rglob('*'):
             if linked(item):
-                raise ValueError('Legacy data contains a link; migration stopped')
+                raise ValueError(tr('error.legacy_data_contains_a_link_migration_stopped'))
         shutil.copytree(source, target)
     else:
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -23,8 +24,8 @@ def checked_copy(source, target):
 
 
 def _relocate(source, target, common):
-    if linked(source):
-        raise ValueError(f'Migration source cannot be a link: {source.name}')
+    if linked(source) or linked(target) or any(linked(parent) for parent in target.parents):
+        raise ValueError(tr('error.migration_source_link', source.name))
     target.parent.mkdir(parents=True, exist_ok=True)
     if not target.exists():
         shutil.move(str(source), str(target))
@@ -43,27 +44,31 @@ def _relocate(source, target, common):
 
 
 def organize_layout(common):
-    """Keep only date/log/runtime at the shared root; shared config lives in runtime/config."""
+    """Shared MCDR files stay at root; each save keeps plugins' native relative layout."""
     common = Path(common).resolve()
     for name in ('date', 'log', 'runtime'):
         directory = common / name
         if linked(directory):
-            raise ValueError(f'{name} directory cannot be a link')
+            raise ValueError(tr('error.directory_link', name))
         directory.mkdir(exist_ok=True)
 
-    old_config = common / 'config'
-    if old_config.exists():
-        _relocate(old_config, common / 'runtime/config', common)
+    for old_config in (common / 'config', common / 'runtime/config'):
+        if old_config.exists():
+            if linked(old_config):
+                raise ValueError(tr('error.legacy_shared_config_cannot_be_a_link'))
+            for item in list(old_config.iterdir()):
+                if item.name in {'config.json', 'config.yml', 'permission.yml', 'download-sources.json', 'plugins'}:
+                    _relocate(item, common / item.name, common)
+                elif item.name.startswith('config.yml.before-'):
+                    item.unlink()
+                else:
+                    _relocate(item, common / 'runtime/legacy-files/shared-config' / item.name, common)
+            old_config.rmdir()
     old_data = common / 'data'
     if old_data.exists():
         _relocate(old_data, common / 'date', common)
 
-    for filename in ('config.json', 'config.yml', 'permission.yml', 'download-sources.json'):
-        source = common / filename
-        if source.exists():
-            _relocate(source, common / 'runtime/config' / filename, common)
     folder_targets = {
-        'plugins': 'runtime/config/plugins',
         'logs': 'log/mcdr',
         '.bridge-venv': 'runtime/.bridge-venv',
         'bridge-runtime': 'runtime/bridge-runtime',
@@ -86,15 +91,13 @@ def organize_layout(common):
             _relocate(source, common / relative, common)
     for source in list(common.glob('bootstrap-resources-*')):
         _relocate(source, common / 'runtime' / source.name, common)
-    for source in list((common / 'runtime/config').glob('config.yml.before-*')):
-        source.unlink()
     for name in ('bootstrap.log', 'install.log', 'controller.log', 'python-install.log'):
         source = common / name
         if source.exists():
             _relocate(source, common / 'log' / name, common)
 
     for source in list(common.iterdir()):
-        if source.name in {'date', 'log', 'runtime'}:
+        if source.name in {'date', 'log', 'runtime', 'plugins', 'config.json', 'config.yml', 'permission.yml', 'download-sources.json'}:
             continue
         if source.is_dir() and (source / 'profile.json').is_file():
             world_name = source.name
@@ -113,9 +116,55 @@ def organize_layout(common):
             _relocate(source, common / 'log' / source.name, common)
         else:
             _relocate(source, common / 'runtime/legacy-files' / source.name, common)
+    for profile in (common / 'date').iterdir():
+        if profile.is_dir() and (profile / 'profile.json').is_file():
+            migrate_profile_data(profile)
+
+
+def migrate_profile_data(profile):
+    """Only undo paths introduced by the bridge; never merge databases or change custom paths."""
+    from .backup_guard import checked_path, check_tree
+    profile = Path(profile).resolve()
+    plans = []
+    for plugin, native in (('prime_backup', 'pb_files'), ('chunk_backup', 'cb_files')):
+        previous = checked_path(profile, 'data/' + plugin)
+        target = checked_path(profile, native)
+        config_path = checked_path(profile, 'config/' + plugin + '/config.json')
+        config = read_json(config_path) if config_path.exists() else None
+        if previous.exists():
+            check_tree(previous)
+            if target.exists() and any(target.iterdir()):
+                raise ValueError(tr('error.store_conflict', plugin, native))
+        plans.append((previous, target, config_path, config, native))
+    for previous, target, config_path, config, native in plans:
+        if previous.exists():
+            if target.exists():
+                target.rmdir()  # Only the preflight-confirmed empty directory.
+            previous.rename(target)
+        if config is not None:
+            configured = Path(config.get('storage_root', './' + native))
+            if not configured.is_absolute():
+                configured = profile / configured
+            if configured.resolve() == previous:
+                config['storage_root'] = './' + native
+                write_json(config_path, config)
+    data = profile / 'data'
+    if data.is_dir() and not any(data.iterdir()):
+        data.rmdir()
 
 
 def migrate_legacy(common):
+    from .supervisor import lock_common
+    common = Path(common).resolve()
+    common.mkdir(parents=True, exist_ok=True)
+    lease = lock_common(common)
+    try:
+        _migrate_legacy(common)
+    finally:
+        lease.close()
+
+
+def _migrate_legacy(common):
     common = Path(common).resolve()
     organize_layout(common)
     marker = common / 'runtime/.legacy-layout.json'
@@ -126,13 +175,13 @@ def migrate_legacy(common):
         return
     source = Path(record['source']).resolve()
     if not source.is_dir():
-        raise ValueError('Legacy MCDR directory is missing; preserve the migration marker and restore that directory first')
+        raise ValueError(tr('error.legacy_mcdr_directory_is_missing_preserve_the_migration_marker_and_restore_that_directory_first'))
     if source != common and (source.is_relative_to(common) or common.is_relative_to(source)):
-        raise ValueError('Legacy and destination directories cannot be nested')
+        raise ValueError(tr('error.legacy_and_destination_directories_cannot_be_nested'))
     from .supervisor import lock_common
-    lock = lock_common(source)
+    lock = lock_common(source) if source != common else None
     try:
-        config_dir = common / 'runtime/config'
+        config_dir = common
         for name in ('config.yml', 'permission.yml', 'download-sources.json'):
             target = config_dir / name
             if (source / name).is_file() and not target.exists():
@@ -141,7 +190,7 @@ def migrate_legacy(common):
         target_plugins = config_dir / 'plugins'
         if plugins.exists() and source != common:
             if linked(plugins) or linked(target_plugins):
-                raise ValueError('Plugin directories cannot be links')
+                raise ValueError(tr('error.plugin_directories_cannot_be_links'))
             target_plugins.mkdir(exist_ok=True)
             for plugin in plugins.iterdir():
                 target = target_plugins / plugin.name
@@ -149,17 +198,17 @@ def migrate_legacy(common):
                     checked_copy(plugin, target)
         worlds = source / 'worlds'
         if linked(worlds):
-            raise ValueError('Legacy profiles cannot be a link')
+            raise ValueError(tr('error.legacy_profiles_cannot_be_a_link'))
         for profile in sorted(worlds.iterdir()) if worlds.exists() else []:
             if not profile.is_dir() or not (profile / 'profile.json').is_file():
                 continue
             target = profile_path(common, profile.name)
             metadata = read_json(profile / 'profile.json')
             if metadata.get('folder') != profile.name or Path(metadata['world_path']).name != profile.name:
-                raise ValueError('Legacy profile name does not match its world binding')
+                raise ValueError(tr('error.legacy_profile_name_does_not_match_its_world_binding'))
             if target.exists():
                 if not (target / '.legacy-import.json').is_file() or read_json(target / '.legacy-import.json').get('source') != str(profile):
-                    raise ValueError('Destination profile already exists; migration will not overwrite it')
+                    raise ValueError(tr('error.destination_profile_already_exists_migration_will_not_overwrite_it'))
                 continue
             staging = common / 'date/.migration-staging' / uuid.uuid4().hex
             checked_copy(profile, staging)
@@ -174,8 +223,10 @@ def migrate_legacy(common):
                 write_json(pb, config)
             write_json(staging / '.legacy-import.json', {'source': str(profile)})
             staging.rename(target)
+            migrate_profile_data(target)
             logging.info('Imported legacy world profile: %s', profile.name)
         record['completed'] = True
         write_json(marker, record)
     finally:
-        lock.close()
+        if lock is not None:
+            lock.close()

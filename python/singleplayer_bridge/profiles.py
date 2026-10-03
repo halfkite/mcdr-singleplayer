@@ -1,4 +1,5 @@
 """World profiles. Relative plugin paths inherit the profile process cwd."""
+from singleplayer_bridge.i18n import tr
 import json
 import re
 import shutil
@@ -21,12 +22,12 @@ def read_json(path):
 def child(root, name):
     root = Path(root).resolve()
     if not name or name in {'.', '..'} or re.search(r'[\\/:*?"<>|\x00-\x1f]', name) or name.endswith((' ', '.')):
-        raise ValueError('Invalid world folder name')
+        raise ValueError(tr('error.invalid_world_folder_name'))
     if name.split('.')[0].upper() in {'CON', 'PRN', 'AUX', 'NUL', *(f'COM{i}' for i in range(1, 10)), *(f'LPT{i}' for i in range(1, 10))}:
-        raise ValueError('Reserved folder name')
+        raise ValueError(tr('error.reserved_folder_name'))
     path = root / name
     if linked(path) or path.resolve().parent != root:
-        raise ValueError('Profile must be a direct folder, without links')
+        raise ValueError(tr('error.profile_must_be_a_direct_folder_without_links'))
     return path
 
 
@@ -42,20 +43,21 @@ def ensure_profile(common, world, language='en_us'):
     world = Path(world).resolve(strict=True)
     common = Path(common).resolve()
     if common.is_relative_to(world):
-        raise ValueError('Shared MCDR directory must be outside the world')
+        raise ValueError(tr('error.shared_mcdr_directory_must_be_outside_the_world'))
     if not (world / 'level.dat').is_file():
-        raise ValueError('World has no level.dat')
+        raise ValueError(tr('error.world_has_no_level_dat'))
     profile = profile_path(common, world.name)
     profile.mkdir(parents=True, exist_ok=True)
     metadata = profile / 'profile.json'
     if metadata.exists() and Path(read_json(metadata)['world_path']).resolve() != world:
-        raise ValueError('This folder name already belongs to a different world; rename the save folder')
+        raise ValueError(tr('error.this_folder_name_already_belongs_to_a_different_world_rename_the_save_folder'))
     write_json(metadata, {'world_path': str(world), 'folder': world.name})
     (profile / 'config').mkdir(exist_ok=True)
-    (profile / 'data').mkdir(exist_ok=True)
+    from .layout import migrate_profile_data
+    migrate_profile_data(profile)
     prime = profile / 'config/prime_backup/config.json'
     if not prime.exists():
-        write_json(prime, {'enabled': True, 'storage_root': str(profile / 'data/prime_backup'),
+        write_json(prime, {'enabled': True, 'storage_root': './pb_files',
             'backup': {'source_root': str(world.parent), 'source_root_use_mcdr_working_directory': False, 'targets': [world.name]}})
         recommend(profile, language=language)
     preferences_path = profile / 'config/singleplayer_bridge/config.json'
@@ -66,6 +68,9 @@ def ensure_profile(common, world, language='en_us'):
         preferences['language'] = language
         write_json(preferences_path, preferences)
     validate_prime_binding(profile)
+    from .chunk_backup_config import installed, prepare
+    if installed(common):
+        prepare(profile, world)
     return profile
 
 
@@ -78,7 +83,7 @@ def recommend(profile, language=None, auto_backup=None, auto_delete=None, backup
     if path.exists():
         backup_file(path)
     config['enabled'] = True
-    config['storage_root'] = str(profile / 'data/prime_backup')
+    config.setdefault('storage_root', './pb_files')
     config.setdefault('backup', {}).update(source_root=str(world.parent), source_root_use_mcdr_working_directory=False, targets=[world.name])
     preferences_path = profile / 'config/singleplayer_bridge/config.json'
     preferences = read_json(preferences_path) if preferences_path.exists() else {}
@@ -128,11 +133,11 @@ def validate_prime_binding(profile):
     if not storage.is_absolute():
         storage = profile / storage
     if not storage.resolve().is_relative_to(profile):
-        raise ValueError('Prime Backup storage_root must be inside the current profile')
+        raise ValueError(tr('error.prime_backup_storage_root_must_be_inside_the_current_profile'))
     if (backup.get('source_root_use_mcdr_working_directory') is not False
             or Path(backup.get('source_root', '')).resolve() != world.parent
             or backup.get('targets') != [world.name]):
-        raise ValueError('Prime Backup configuration is not bound to this world; use recommended configuration')
+        raise ValueError(tr('error.prime_backup_configuration_is_not_bound_to_this_world_use_recommended_configuration'))
     write_json(profile / 'config/singleplayer_prime_backup/config.json', {'world_path': str(world)})
     return True
 
@@ -142,11 +147,11 @@ def import_configs(common, destination, source_name, replace=False):
     destination = Path(destination).resolve()
     source = profile_path(common, source_name)
     if source.resolve() == destination or not (source / 'profile.json').is_file():
-        raise ValueError('Select another existing world profile')
+        raise ValueError(tr('error.select_another_existing_world_profile'))
     copied = []
     source_config = source / 'config'
     if linked(source_config) or source_config.resolve().parent != source.resolve():
-        raise ValueError('Configuration directory cannot be a link')
+        raise ValueError(tr('error.configuration_directory_cannot_be_a_link'))
     if not source_config.exists():
         return copied
     for file in source_config.rglob('*'):
@@ -158,12 +163,12 @@ def import_configs(common, destination, source_name, replace=False):
         if not file.is_file() or not permitted or any(p.lower() in {'data', 'cache', 'backups', 'database'} for p in relative.parts[:-1]):
             continue
         if any(linked(source_config / Path(*relative.parts[:i])) for i in range(1, len(relative.parts) + 1)):
-            raise ValueError('Configuration links cannot be imported')
-        if relative.parts[0] in {'singleplayer_bridge', 'singleplayer_prime_backup'}:
+            raise ValueError(tr('error.configuration_links_cannot_be_imported'))
+        if relative.parts[0] in {'singleplayer_bridge', 'singleplayer_prime_backup', 'singleplayer_chunk_backup'}:
             continue
         target = destination / 'config' / relative
         if not target.resolve().is_relative_to(destination) or target.is_symlink():
-            raise ValueError('Configuration target leaves the profile')
+            raise ValueError(tr('error.configuration_target_leaves_the_profile'))
         if target.exists() and not replace:
             continue
         if target.exists():
@@ -173,9 +178,14 @@ def import_configs(common, destination, source_name, replace=False):
             # Import policy/settings, excluding world and backup database location.
             config = read_json(file)
             world = Path(read_json(destination / 'profile.json')['world_path'])
-            config['storage_root'] = str(destination / 'data/prime_backup')
+            config['storage_root'] = './pb_files'
             config.setdefault('backup', {}).update(source_root=str(world.parent), source_root_use_mcdr_working_directory=False, targets=[world.name])
             write_json(target, config)
+        elif relative.as_posix() == 'chunk_backup/config.json':
+            from .chunk_backup_config import rebind, prepare
+            world = Path(read_json(destination / 'profile.json')['world_path'])
+            prepare(destination, world)
+            write_json(target, rebind(read_json(file), destination, world))
         else:
             shutil.copy2(file, target)
         copied.append(relative.as_posix())

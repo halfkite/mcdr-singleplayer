@@ -17,10 +17,12 @@ final class BridgeConfig {
     boolean autoStartMcdr = true;
     String pythonExecutable = "";
     boolean autoInstall = true;
+    boolean onboardingDismissed = false;
+    String onboardingLastClientId = "";
 
     static Path rootForGame(Path game) { return game.resolve("mcdr-singleplayer"); }
     static Path runtimeForGame(Path game) { return rootForGame(game).resolve("runtime"); }
-    static Path configRootForGame(Path game) { return runtimeForGame(game).resolve("config"); }
+    static Path configRootForGame(Path game) { return rootForGame(game); }
     static Path pathForGame(Path game) { return configRootForGame(game).resolve("config.json"); }
 
     static BridgeConfig loadForGame(Path game) throws IOException {
@@ -33,12 +35,13 @@ final class BridgeConfig {
         }
         if (Files.isSymbolicLink(path.getParent()) || Files.isSymbolicLink(path))
             throw new IOException("The mcdr-singleplayer configuration cannot be a link");
-        Path previousStatus = game.resolve("config/.mcdr_restore_progress.json");
-        if (Files.isRegularFile(previousStatus)) {
+        for (Path previousStatus : new Path[]{game.resolve("config/.mcdr_restore_progress.json"), runtimeForGame(game).resolve(".mcdr_restore_progress.json")}) {
+          if (Files.isRegularFile(previousStatus)) {
             var state = com.google.gson.JsonParser.parseString(Files.readString(previousStatus)).getAsJsonObject();
             if (state.has("status") && "running".equals(state.get("status").getAsString())
                     && state.has("backend_pid") && ProcessHandle.of(state.get("backend_pid").getAsLong()).map(ProcessHandle::isAlive).orElse(false))
                 throw new IOException("An old restore is running; wait for it to finish before migrating");
+          }
         }
         migrateGroupedDirectories(root);
         Files.createDirectories(configRootForGame(game));
@@ -94,14 +97,31 @@ final class BridgeConfig {
 
     private static void migrateGroupedDirectories(Path root) throws IOException {
         Path runtime = root.resolve("runtime");
-        Path config = runtime.resolve("config");
-        Path oldConfig = root.resolve("config");
         Path oldData = root.resolve("data");
-        Files.createDirectories(config);
-        if (Files.exists(oldConfig, LinkOption.NOFOLLOW_LINKS)) moveMerge(oldConfig, config, runtime);
-        for (String name : new String[]{"config.json", "config.yml", "permission.yml", "download-sources.json"}) {
-            Path legacyFile = root.resolve(name);
-            if (Files.exists(legacyFile, LinkOption.NOFOLLOW_LINKS)) moveMerge(legacyFile, config.resolve(name), runtime);
+        for (Path oldConfig : new Path[]{root.resolve("config"), runtime.resolve("config")}) {
+            if (!Files.exists(oldConfig, LinkOption.NOFOLLOW_LINKS)) continue;
+            if (Files.isSymbolicLink(oldConfig)) throw new IOException("Legacy shared config cannot be a link");
+            for (String lockName : new String[]{".controller.lock", ".installation.lock"}) {
+                Path lockFile = runtime.resolve(lockName);
+                if (Files.exists(lockFile)) {
+                    try (var channel = java.nio.channels.FileChannel.open(lockFile, java.nio.file.StandardOpenOption.WRITE)) {
+                        try (var lock = channel.tryLock(0, 1, false)) {
+                            if (lock == null) throw new IOException("MCDR is running; close the other client before migrating shared files");
+                        } catch (java.nio.channels.OverlappingFileLockException e) {
+                            throw new IOException("MCDR is running; shared configuration migration is blocked", e);
+                        }
+                    }
+                }
+            }
+            try (var children = Files.list(oldConfig)) {
+                for (Path child : children.toList()) {
+                    String name = child.getFileName().toString();
+                    if (java.util.Set.of("config.json", "config.yml", "permission.yml", "download-sources.json", "plugins").contains(name))
+                        moveMerge(child, root.resolve(name), runtime);
+                    else moveMerge(child, runtime.resolve("legacy-files/shared-config").resolve(name), runtime);
+                }
+            }
+            Files.delete(oldConfig);
         }
         if (Files.exists(oldData, LinkOption.NOFOLLOW_LINKS)) moveMerge(oldData, root.resolve("date"), runtime);
     }

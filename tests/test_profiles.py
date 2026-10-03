@@ -1,6 +1,7 @@
 import io
 import hashlib
 import json
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -26,6 +27,7 @@ def test_isolated_worlds_import_only_settings_and_rebind_backup(tmp_path):
     write_json(a / 'config/probe/config.json', {'custom': True})
     write_json(a / 'config/probe/players.json', {'data': 'never copy'})
     write_json(a / 'config/probe/data/settings.json', {'data': 'never copy'})
+    (a / 'data').mkdir()
     (a / 'data/db.sqlite').write_bytes(b'db')
     imported = import_configs(common, b, a.name)
     assert imported == ['probe/config.json']
@@ -36,7 +38,7 @@ def test_isolated_worlds_import_only_settings_and_rebind_backup(tmp_path):
     assert 'prime_backup/config.json' in copied
     config = read_json(b / 'config/prime_backup/config.json')
     assert config['backup']['targets'] == ['世界 B']
-    assert config['storage_root'] == str(b / 'data/prime_backup')
+    assert config['storage_root'] == './pb_files'
     assert validate_prime_binding(b)
     assert list((b / 'config/prime_backup').glob('config.json.before-*'))
 
@@ -53,6 +55,27 @@ def test_world_name_collision_and_external_store_are_rejected(tmp_path):
     write_json(profile / 'config/prime_backup/config.json', config)
     with pytest.raises(ValueError, match='inside the current profile'):
         ensure_profile(common, first)
+
+
+def test_chunk_backup_profiles_import_policy_without_backup_slots(tmp_path):
+    common = tmp_path / 'common'
+    plugins = common / 'plugins'
+    plugins.mkdir(parents=True)
+    with zipfile.ZipFile(plugins / 'chunk_backup.mcdr', 'w') as archive:
+        archive.writestr('mcdreforged.plugin.json', json.dumps(dict(id='chunk_backup', version='2.0.3')))
+    a = ensure_profile(common, world(tmp_path, 'A'))
+    b = ensure_profile(common, world(tmp_path, 'B'))
+    config = read_json(a / 'config/chunk_backup/config.json')
+    config['command'] = dict(restore_countdown_sec=7)
+    write_json(a / 'config/chunk_backup/config.json', config)
+    (a / 'cb_files/slot-data').write_bytes(b'backup')
+    assert 'chunk_backup/config.json' in import_configs(common, b, 'A', replace=True)
+    imported = read_json(b / 'config/chunk_backup/config.json')
+    assert imported['command']['restore_countdown_sec'] == 7
+    assert imported['storage_root'] == './cb_files'
+    assert all(dim['world_name'] == 'B' for dim in imported['backup']['dimension'].values())
+    assert read_json(b / 'config/singleplayer_chunk_backup/config.json')['world_path'] == str(tmp_path / 'saves/B')
+    assert not (b / 'cb_files/slot-data').exists()
 
 
 def test_import_does_not_classify_yaml_player_state_as_configuration(tmp_path):

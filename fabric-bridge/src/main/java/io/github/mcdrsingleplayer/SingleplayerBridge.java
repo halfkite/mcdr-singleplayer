@@ -163,7 +163,7 @@ public final class SingleplayerBridge implements ModInitializer {
     private int forward(FabricClientCommandSource source, String command) {
         BridgeEndpoint bridge = endpoint;
         if (bridge == null || !bridge.clientChat(source.getPlayer().getPlainTextName(), command)) {
-            source.sendError(Component.literal("MCDR 尚未连接当前单人存档，请查看 mcdr-singleplayer/log/bootstrap.log。"));
+            source.sendError(Component.translatable("mcdr-singleplayer.client.no_connection"));
             return 0;
         }
         return 1;
@@ -171,11 +171,11 @@ public final class SingleplayerBridge implements ModInitializer {
 
     private int setup(FabricClientCommandSource source, String action) {
         if (runtime == null || worldServer == null || endpoint == null) {
-            source.sendError(Component.literal("请启用游戏自动启动模式并进入单人存档。"));
+            source.sendError(Component.translatable("mcdr-singleplayer.client.auto_required"));
             return 0;
         }
         runtime.requestSetup(action, source.getPlayer().getPlainTextName());
-            source.sendFeedback(Component.literal("已提交 MCDR 设置请求；完成结果见 mcdr-singleplayer/log/存档名/controller-child.log。"));
+            source.sendFeedback(Component.translatable("mcdr-singleplayer.client.setup_submitted"));
         return 1;
     }
 
@@ -184,12 +184,12 @@ public final class SingleplayerBridge implements ModInitializer {
             closeDispatcher.accept(() -> {
                 var client = Minecraft.getInstance();
                 if (server != worldServer || client.getSingleplayerServer() != server || !request.valid()) {
-                    request.complete(false, "World close cancelled: world changed or connection lost");
+                    request.complete(false, net.minecraft.network.chat.Component.translatable("mcdr-singleplayer.error.world_close_cancelled_world_changed_or_connection_lost").getString());
                     return;
                 }
                 request.complete(true, "Saving and closing the singleplayer world");
                 restoreProgress.closingWorld(server.getWorldPath(LevelResource.ROOT).toAbsolutePath().toString(), endpoint.session);
-                client.disconnectFromWorld(Component.literal("Prime Backup restore"));
+                client.disconnectFromWorld(Component.translatable("mcdr-singleplayer.restore.disconnect"));
                 client.gui.setScreen(new net.minecraft.client.gui.screens.TitleScreen());
             });
         } else server.execute(() -> execute(server, request));
@@ -204,21 +204,42 @@ public final class SingleplayerBridge implements ModInitializer {
 
     private void execute(MinecraftServer server, BridgeEndpoint.Request request) {
         if (server != worldServer || !request.valid() || server.isStopped() || server.isPaused()) {
-            request.complete(false, "Command discarded: world changed, paused, disconnected or deadline expired");
+            request.complete(false, net.minecraft.network.chat.Component.translatable("mcdr-singleplayer.error.command_discarded_world_changed_paused_disconnected_or_deadline_expired").getString());
             return;
         }
         String command = request.command.strip();
         if (command.startsWith("/")) command = command.substring(1);
         if (command.isBlank() || command.indexOf('\n') >= 0 || command.indexOf('\r') >= 0) {
-            request.complete(false, "Command rejected: empty or multiline input");
+            request.complete(false, net.minecraft.network.chat.Component.translatable("mcdr-singleplayer.error.command_rejected_empty_or_multiline_input").getString());
             return;
         }
         if (command.equals("stop") || command.startsWith("stop ")) {
-            request.complete(false, "World shutdown is not supported; use Save and Quit in Minecraft");
+            request.complete(false, net.minecraft.network.chat.Component.translatable("mcdr-singleplayer.error.world_shutdown_is_not_supported_use_save_and_quit_in_minecraft").getString());
             return;
         }
         Capture capture = new Capture();
         try {
+            // Read both values in one server tick; plugin adapters need no translated NBT text.
+            if (command.startsWith("__bridge_player_data__ ")) {
+                String name = command.substring("__bridge_player_data__ ".length());
+                if (!name.matches("[A-Za-z0-9_]{3,16}")) {
+                    request.complete(false, net.minecraft.network.chat.Component.translatable("mcdr-singleplayer.error.invalid_player_name").getString());
+                    return;
+                }
+                var player = server.getPlayerList().getPlayerByName(name);
+                if (player == null) {
+                    request.complete(false, net.minecraft.network.chat.Component.translatable("mcdr-singleplayer.error.player_is_no_longer_in_this_world").getString());
+                    return;
+                }
+                var data = new com.google.gson.JsonObject();
+                data.addProperty("player", player.getPlainTextName());
+                data.addProperty("x", player.getX());
+                data.addProperty("y", player.getY());
+                data.addProperty("z", player.getZ());
+                data.addProperty("dimension", player.level().dimension().identifier().toString());
+                request.complete(true, data.toString());
+                return;
+            }
             // These dedicated-server commands are absent from the integrated dispatcher.
             // Invoke the same game save APIs and only acknowledge after flush has finished.
             if (command.equals("save-off")) {
@@ -237,7 +258,7 @@ public final class SingleplayerBridge implements ModInitializer {
             }
             if (command.equals("save-all") || command.equals("save-all flush")) {
                 boolean success = server.saveEverything(true, command.endsWith(" flush"), true);
-                request.complete(success, success ? "Saved the game" : "World save failed");
+                request.complete(success, success ? "Saved the game" : net.minecraft.network.chat.Component.translatable("mcdr-singleplayer.error.world_save_failed").getString());
                 return;
             }
             var source = server.createCommandSourceStack().withSource(capture)
@@ -246,7 +267,7 @@ public final class SingleplayerBridge implements ModInitializer {
             String output = capture.text.length() == 0 ? "Command completed (result " + capture.result + ")" : capture.text.toString();
             request.complete(capture.success, output);
         } catch (RuntimeException e) {
-            request.complete(false, "Command execution failed (" + e.getClass().getSimpleName() + ")");
+            request.complete(false, Component.translatable("mcdr-singleplayer.client.execution_failed", e.getClass().getSimpleName()).getString());
         }
     }
 

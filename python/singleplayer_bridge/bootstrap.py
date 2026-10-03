@@ -1,4 +1,5 @@
 """Install the tested MCDR/PB runtime without modifying global Python packages."""
+from singleplayer_bridge.i18n import tr
 import argparse
 import hashlib
 import logging
@@ -27,7 +28,7 @@ def download_checked(urls, destination, digest, opener=urllib.request.urlopen):
     for url in urls:
         try:
             started = time.monotonic()
-            request = urllib.request.Request(url, headers={'User-Agent': 'MCDR-Singleplayer-Bridge/0.3.5'})
+            request = urllib.request.Request(url, headers={'User-Agent': 'MCDR-Singleplayer-Bridge/0.3.10'})
             with opener(request, timeout=15) as response, temporary.open('wb') as output:
                 total = 0
                 while chunk := response.read(65536):
@@ -36,14 +37,14 @@ def download_checked(urls, destination, digest, opener=urllib.request.urlopen):
                         raise OSError('Download too large or too slow')
                     output.write(chunk)
             if hashlib.sha256(temporary.read_bytes()).hexdigest() != digest:
-                raise ValueError('Downloaded artifact hash does not match the tested release')
+                raise ValueError(tr('error.downloaded_artifact_hash_does_not_match_the_tested_release'))
             temporary.replace(destination)
             logging.info('Verified download succeeded: %s', url)
             return
         except Exception as exc:
             logging.warning('Download failed, trying next source: %s (%s)', url, type(exc).__name__)
             temporary.unlink(missing_ok=True)
-    raise RuntimeError('All download sources failed; see log/install.log')
+    raise RuntimeError(tr('error.all_download_sources_failed_see_log_install_log'))
 
 
 def install_dependencies(python, requirements, indexes=None, runner=subprocess.run):
@@ -58,7 +59,7 @@ def install_dependencies(python, requirements, indexes=None, runner=subprocess.r
             continue
         if result.returncode == 0:
             return
-    raise RuntimeError('Dependency installation failed on all indexes')
+    raise RuntimeError(tr('error.dependency_installation_failed_on_all_indexes'))
 
 
 def pack(source, target):
@@ -74,7 +75,7 @@ def configure_common(common, python, runtime):
     """Shared config/permissions/plugins; cwd is chosen by the controller per world."""
     from ruamel.yaml import YAML
     yaml = YAML()
-    config_dir = common / 'runtime/config'
+    config_dir = common
     config_dir.mkdir(parents=True, exist_ok=True)
     path = config_dir / 'config.yml'
     config = yaml.load(path.read_text(encoding='utf-8-sig'))
@@ -93,7 +94,7 @@ def install(common, resources, update=False):
     from .layout import migrate_legacy
     migrate_legacy(common)
     runtime_root = common / 'runtime'
-    config_dir = common / 'runtime/config'
+    config_dir = common
     environment = runtime_root / '.bridge-venv'
     python = environment / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
     if not python.exists():
@@ -123,48 +124,33 @@ def install(common, resources, update=False):
                     shutil.copy2(Path(directory) / name, config_dir / name)
     configure = [str(python), str(resources / 'bridge_bootstrap.py'), '--configure-only', '--common', str(common), '--resources', str(resources)]
     subprocess.run(configure, check=True, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
-    for folder, name in [('bridge-plugin', 'singleplayer_bridge.mcdr'), ('adapter-plugin', 'singleplayer_prime_backup.mcdr')]:
-        # Stable names prevent duplicate installed plugin IDs. Preserve any old versions outside plugins.
+    # Backup plugins are opt-in. Keep bundled adapters outside the live plugin directory
+    # until their upstream plugin is present; first-run chat provides install buttons.
+    from .onboarding import archives
+    bundled_plugins = [('bridge-plugin', 'singleplayer_bridge.mcdr')]
+    adapter_store = runtime_root / 'backup-adapters'
+    adapter_store.mkdir(exist_ok=True)
+    for folder, plugin_id, upstream in [('adapter-plugin', 'singleplayer_prime_backup', 'prime_backup'),
+                                        ('chunk-adapter-plugin', 'singleplayer_chunk_backup', 'chunk_backup')]:
+        pack(resources / folder, adapter_store / (plugin_id + '.mcdr'))
+        tested = '1.13.1' if upstream == 'prime_backup' else '2.0.3'
+        existing = archives(common, upstream)
+        if len(existing) == 1 and existing[0][1] == tested:
+            bundled_plugins.append((folder, plugin_id + '.mcdr'))
+    for folder, name in bundled_plugins:
         plugin_id = name.removesuffix('.mcdr')
         prepared = runtime_root / (name + '.prepared')
         pack(resources / folder, prepared)
-        installed = plugins / name
-        if installed.exists() and installed.read_bytes() == prepared.read_bytes():
+        target = plugins / name
+        if target.exists() and target.read_bytes() == prepared.read_bytes():
             prepared.unlink()
             continue
-        for file in plugins.iterdir():
-            if file.suffix not in {'.mcdr', '.pyz'} or not zipfile.is_zipfile(file):
-                continue
-            with zipfile.ZipFile(file) as archive:
-                try:
-                    import json
-                    metadata = json.loads(archive.read('mcdreforged.plugin.json'))
-                except (KeyError, ValueError):
-                    continue
-            if metadata.get('id') == plugin_id:
-                history = runtime_root / 'install-history' / str(time.time_ns())
-                history.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(file), str(history / file.name))
-        prepared.replace(installed)
-    prime = plugins / f'PrimeBackup-v{PRIME_VERSION}.pyz'
-    existing_prime = []
-    for file in plugins.iterdir():
-        if zipfile.is_zipfile(file):
-            with zipfile.ZipFile(file) as archive:
-                try:
-                    import json
-                    metadata = json.loads(archive.read('mcdreforged.plugin.json'))
-                except (KeyError, ValueError):
-                    continue
-            if metadata.get('id') == 'prime_backup':
-                existing_prime.append(file)
-    if any(file != prime for file in existing_prime):
-        raise RuntimeError('Existing Prime Backup version differs from the tested adapter; preserved without replacement')
-    if not prime.exists() or hashlib.sha256(prime.read_bytes()).hexdigest() != PRIME_HASH:
-        mirrors_path = config_dir / 'download-sources.json'
-        mirrors = read_json(mirrors_path).get('github_mirrors', DEFAULT_MIRRORS) if mirrors_path.exists() else DEFAULT_MIRRORS
-        download_checked([PRIME_URL, *(base + PRIME_URL for base in mirrors)], prime, PRIME_HASH)
-    write_json(marker, dict(mcdr='2.16.0', prime_backup=PRIME_VERSION, requirements_sha256=signature, checked_at=time.time(), python=str(python)))
+        for file, _ in archives(common, plugin_id):
+            history = runtime_root / 'install-history' / str(time.time_ns())
+            history.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(file), str(history / file.name))
+        prepared.replace(target)
+    write_json(marker, dict(mcdr='2.16.0', backup_plugins_opt_in=True, requirements_sha256=signature, checked_at=time.time(), python=str(python)))
     return python
 
 

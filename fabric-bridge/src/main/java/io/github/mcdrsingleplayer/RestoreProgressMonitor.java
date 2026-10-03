@@ -104,7 +104,7 @@ public final class RestoreProgressMonitor implements AutoCloseable {
             if (value == null) return;
             if (value.running() && value.backendPid() > 0 && !ProcessHandle.of(value.backendPid()).map(ProcessHandle::isAlive).orElse(false)) {
                 value = new Progress(value.operation(), value.session(), value.world(), value.backup(), "failed", "failed",
-                    "Restore process exited unexpectedly", value.started(), value.backendPid(), value.modified());
+                    "mcdr-singleplayer.restore.detail.interrupted", value.started(), value.backendPid(), value.modified());
             }
             latest = value;
             boolean previouslyLocked = lockedWorlds.contains(value.world());
@@ -140,7 +140,7 @@ public final class RestoreProgressMonitor implements AutoCloseable {
         String detail = record.get("detail").getAsString();
         if (!operation.matches("[a-f0-9]{32}") || world.length() > 255 || detail.length() > 512
                 || !Set.of("running", "completed", "failed", "cancelled").contains(status)
-                || !Set.of("checking", "saving", "safety_backup", "restoring", "completed", "failed", "cancelled").contains(stage)) return null;
+                || !Set.of("checking", "saving", "safety_backup", "restoring", "rolling_back", "player_data", "completed", "failed", "cancelled").contains(stage)) return null;
         int backup = record.get("backup_id").isJsonNull() ? 0 : record.get("backup_id").getAsInt();
         return new Progress(operation, recordSession, world, backup, stage, status, detail,
             record.get("started_at").getAsLong(), record.get("backend_pid").getAsLong(),

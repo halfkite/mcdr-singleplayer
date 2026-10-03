@@ -3,6 +3,7 @@
   "id": "mcdr-singleplayer",
   "version": "${version}",
   "name": "mcdr-singleplayer",
+  "icon": "assets/mcdr-singleplayer/icon.png",
   "description": "Connect MCDReforged to the integrated server of a singleplayer world.",
   "license": "LGPL-3.0-only",
   "environment": "client",

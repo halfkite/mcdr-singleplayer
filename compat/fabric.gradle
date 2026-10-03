@@ -1,0 +1,30 @@
+plugins { id '@LOOM_PLUGIN@' version '1.17.21' }
+version = '@VERSION@+fabric+mc@GAME@'
+group = 'io.github.mcdrsingleplayer'
+@MIXIN_AP@
+dependencies {
+    minecraft 'com.mojang:minecraft:@GAME@'
+    @MAPPINGS@
+    @MOD_DEPENDENCY@ 'net.fabricmc:fabric-loader:@LOADER@'
+    @MOD_DEPENDENCY@ 'net.fabricmc.fabric-api:fabric-api:@FABRIC_API@'
+}
+tasks.withType(JavaCompile).configureEach { options.release = @JAVA@ }
+tasks.register('bundleInstaller', Zip) {
+    archiveFileName = 'mcdr-install.zip'
+    destinationDirectory = layout.buildDirectory.dir('installer')
+    from('@ROOT@/python') { into 'runtime'; exclude '**/__pycache__/**', '**/*.pyc', 'mcdreforged.plugin.json', '.gitignore' }
+    from('@ROOT@/python/bridge_bootstrap.py')
+    from('@ROOT@/python') { into 'bridge-plugin'; exclude '**/__pycache__/**', '**/*.pyc', 'bridge_*.py', '.gitignore' }
+    from('@ROOT@/prime-backup-adapter') { into 'adapter-plugin'; exclude '**/__pycache__/**', '**/*.pyc' }
+    from('@ROOT@/chunk-backup-adapter') { into 'chunk-adapter-plugin'; exclude '**/__pycache__/**', '**/*.pyc' }
+    from('@ROOT@/requirements-prime-backup.txt')
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+processResources {
+    dependsOn 'bundleInstaller'
+    from(tasks.named('bundleInstaller').flatMap { it.archiveFile })
+    from('@ROOT@/python/singleplayer_bridge/lang') { into 'assets/mcdr-singleplayer/lang' }
+    from('@ROOT@/fabric-bridge/src/main/resources/assets/mcdr-singleplayer/icon.png') { into 'assets/mcdr-singleplayer' }
+}
+jar { from('@ROOT@/LICENSE') }

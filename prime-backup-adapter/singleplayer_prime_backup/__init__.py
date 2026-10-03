@@ -1,4 +1,5 @@
 """Optional, version-pinned adapter. The upstream Prime Backup archive remains unchanged."""
+from singleplayer_bridge.i18n import tr
 import functools
 import importlib
 import time
@@ -15,26 +16,26 @@ _prime_instance = None
 def bridge():
     module = _server.get_plugin_instance('singleplayer_bridge')
     if module is None:
-        raise RuntimeError('Singleplayer bridge plugin is not loaded')
+        raise RuntimeError(tr('error.singleplayer_bridge_plugin_is_not_loaded'))
     return module.plugin
 
 
 def preflight(task, restore=False):
     if not _world_path:
-        raise RuntimeError('No world bound to the Prime Backup adapter; run setup_prime_backup.py')
+        raise RuntimeError(tr('error.no_world_bound_to_the_prime_backup_adapter_run_setup_prime_backup_py'))
     world = check_binding(_world_path, task.config)
     if restore and task.config.backup.retain_patterns:
-        raise RuntimeError('This adapter requires empty retain_patterns to keep restoration inside the bound world')
+        raise RuntimeError(tr('error.this_adapter_requires_empty_retain_patterns_to_keep_restoration_inside_the_bound_world'))
     commands = task.config.server.commands
     if (not task.config.server.turn_off_auto_save or commands.auto_save_off != 'save-off'
             or commands.save_all_worlds != 'save-all flush' or commands.auto_save_on != 'save-on'):
-        raise RuntimeError('Singleplayer backups require the adapter save-off / save-all flush / save-on configuration')
+        raise RuntimeError(tr('error.singleplayer_backups_require_the_adapter_save_off_save_all_flush_save_on_configuration'))
     state = bridge().snapshot()
     if state.get('session'):
         if Path(state['world_path']).resolve() != world:
-            raise RuntimeError('Connected world differs from the bound backup world')
+            raise RuntimeError(tr('error.connected_world_differs_from_the_bound_backup_world'))
         if not restore and state.get('paused'):
-            raise RuntimeError('World paused; resume the game before creating a backup')
+            raise RuntimeError(tr('error.world_paused_resume_the_game_before_creating_a_backup'))
     else:
         check_unlocked(world)
     return world
@@ -59,7 +60,7 @@ class PrimeServer:
     def stop(self):
         state = bridge().snapshot()
         if not state.get('session') or Path(state['world_path']).resolve() != self.world:
-            raise RuntimeError('Restore lost its world connection; restoration cancelled')
+            raise RuntimeError(tr('error.restore_lost_its_world_connection_restoration_cancelled'))
         self.closing_session = state['session']
         from singleplayer_bridge.restore_progress import current_restore
         progress = current_restore.get()
@@ -70,21 +71,21 @@ class PrimeServer:
 
     def wait_until_stop(self):
         if self.closing_session is None:
-            raise RuntimeError('Restore did not request world shutdown')
+            raise RuntimeError(tr('error.restore_did_not_request_world_shutdown'))
         bridge().wait_world_closed(self.closing_session, timeout=60)
         deadline = time.monotonic() + 10
         while self.server.is_server_running():
             if time.monotonic() >= deadline:
-                raise RuntimeError('Proxy did not stop after world shutdown; restoration cancelled')
+                raise RuntimeError(tr('error.proxy_did_not_stop_after_world_shutdown_restoration_cancelled'))
             time.sleep(0.05)
         check_unlocked(self.world)
 
     def start(self):
         import os
         if os.environ.get('MCDR_BRIDGE_COMMON'):
-            self.server.logger.info('单人存档回档完成。请在 Minecraft 中重新进入原世界，MCDR 将自动连接对应存档配置。')
+            self.server.logger.info(tr('restore.reenter_auto'))
         else:
-            self.server.logger.info('单人存档回档完成。请在 Minecraft 中手动进入原世界，再执行 !!MCDR server start 连接。')
+            self.server.logger.info(tr('restore.reenter_manual'))
         return False
 
 
@@ -95,7 +96,7 @@ def _install():
         return
     metadata = _server.get_plugin_metadata('prime_backup')
     if str(metadata.version) != '1.13.1':
-        raise RuntimeError('The adapter only supports Prime Backup 1.13.1')
+        raise RuntimeError(tr('error.the_adapter_only_supports_prime_backup_1_13_1'))
     for module_name, class_name, restore in [
         ('prime_backup.mcdr.task.backup.create_backup_task', 'CreateBackupTask', False),
         ('prime_backup.mcdr.task.backup.restore_backup_task', 'RestoreBackupTask', True),
@@ -106,6 +107,11 @@ def _install():
         def make_wrapper(original_run, restoring):
             @functools.wraps(original_run)
             def run(task):
+                from singleplayer_bridge.restore_progress import exclusive_backup
+                with exclusive_backup():
+                    return run_exclusive(task)
+
+            def run_exclusive(task):
                 if restoring:
                     from singleplayer_bridge.restore_progress import RestoreProgress, current_restore
                     context = bridge().restore_progress_context()
@@ -149,7 +155,7 @@ def _install():
                         progress.data['backup_id'] = task.backup_id
                     # A restore must verify all files; partial restoration is not offered here.
                     if task.fail_soft or not task.verify_blob:
-                        raise RuntimeError('Singleplayer restore requires blob verification and fail_soft=False')
+                        raise RuntimeError(tr('error.singleplayer_restore_requires_blob_verification_and_fail_soft_false'))
                 original_server = task.server
                 task.server = PrimeServer(original_server, world)
                 try:
@@ -179,7 +185,7 @@ def _install():
                 result = original_run(action)
                 if progress is not None and action_stage == 'restoring':
                     if len(result) != 0:
-                        raise RuntimeError('Restore finished with file verification failures')
+                        raise RuntimeError(tr('error.restore_finished_with_file_verification_failures'))
                     progress.exported = True
                 return result
             run._spbridge_original = original_run

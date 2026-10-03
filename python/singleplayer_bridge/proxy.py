@@ -1,4 +1,5 @@
 """MCDR-managed stdin/stdout proxy. No Minecraft or MCDR dependency required."""
+from singleplayer_bridge.i18n import tr
 import argparse
 import os
 import json
@@ -75,20 +76,20 @@ class BridgeProxy:
         # This lock attaches the session at read time, rather than at reconnect time.
         with self.lock:
             if not self.connection or not self.session:
-                reject('Command discarded: no world connected')
+                reject(tr('error.command_discarded_no_world_connected'))
                 return
             if self.paused and command != SAVE_AND_QUIT:
-                reject('Command discarded: world paused; resume the game first')
+                reject(tr('error.command_discarded_world_paused_resume_the_game_first'))
                 return
             if len(command) > MAX_COMMAND or '\x00' in command:
-                reject('Command discarded: invalid or oversized command')
+                reject(tr('error.command_discarded_invalid_or_oversized_command'))
                 return
             if len(self.pending) >= 64:
-                reject('Command discarded: too many pending requests')
+                reject(tr('error.command_discarded_too_many_pending_requests'))
                 return
             request_id = request_id or uuid.uuid4().hex
             if request_id in self.pending:
-                self.error('Command discarded: duplicate request id')
+                self.error(tr('error.command_discarded_duplicate_request_id'))
                 return
             deadline = time.time() + 10
             frame = {
@@ -100,10 +101,10 @@ class BridgeProxy:
                 self.connection.sendall(encode_frame(frame))
             except ProtocolError:
                 self.pending.pop(request_id, None)
-                reject('Command discarded: encoded request exceeds frame limit')
+                reject(tr('error.command_discarded_encoded_request_exceeds_frame_limit'))
             except OSError:
                 self.pending.pop(request_id, None)
-                self.error('Connection lost while sending command; command will not be replayed')
+                self.error(tr('error.connection_lost_while_sending_command_command_will_not_be_replayed'))
                 self.close()
 
     def stdin_loop(self):
@@ -116,7 +117,7 @@ class BridgeProxy:
                 # Drain the remainder so it cannot turn into a second command.
                 while line and not line.endswith('\n'):
                     line = self.stdin.readline(MAX_COMMAND + 2)
-                self.error('Command discarded: invalid or oversized input line')
+                self.error(tr('error.command_discarded_invalid_or_oversized_input_line'))
                 continue
             command = line.rstrip('\r\n')
             if command == DISCONNECT_COMMAND:
@@ -157,7 +158,7 @@ class BridgeProxy:
                         raise ProtocolError('invalid checked command')
                     self.send_command(command, request_id)
                 except (ValueError, TypeError, AttributeError):
-                    self.error('Command discarded: invalid checked request')
+                    self.error(tr('error.command_discarded_invalid_checked_request'))
                 continue
             if command.strip():
                 self.send_command(command)
@@ -183,7 +184,7 @@ class BridgeProxy:
             for key in expired:
                 del self.pending[key]
         if expired:
-            self.error(f'{len(expired)} command request(s) timed out; execution is uncertain, no replay')
+            self.error(tr('proxy.timeout', len(expired)))
         if kind == 'world_stopped':
             self.stop.set()
 
@@ -233,7 +234,7 @@ class BridgeProxy:
             if self.stop.is_set():
                 return 0
             # Errors are deliberately generic: configuration and network data can contain secrets.
-            self.error(f'Bridge session ended ({type(exc).__name__}); no commands will be replayed')
+            self.error(tr('proxy.session_ended', type(exc).__name__))
             return 1
         finally:
             with self.lock:
@@ -245,7 +246,7 @@ class BridgeProxy:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--config', type=Path, help='Game mcdr-singleplayer/runtime/config/config.json')
+    parser.add_argument('--config', type=Path, help='Game mcdr-singleplayer/config.json')
     parser.add_argument('--config-env', action='store_true')
     args = parser.parse_args()
     if args.config_env:

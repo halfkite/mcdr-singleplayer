@@ -18,11 +18,13 @@ tasks.register('bundleInstaller', Zip) {
     from('../python/bridge_bootstrap.py')
     from('../python') { into 'bridge-plugin'; exclude '**/__pycache__/**', '**/*.pyc', 'bridge_*.py', '.gitignore' }
     from('../prime-backup-adapter') { into 'adapter-plugin'; exclude '**/__pycache__/**', '**/*.pyc' }
+    from('../chunk-backup-adapter') { into 'chunk-adapter-plugin'; exclude '**/__pycache__/**', '**/*.pyc' }
     from('../requirements-prime-backup.txt')
 }
 processResources {
     dependsOn tasks.named('bundleInstaller')
     from(tasks.named('bundleInstaller').flatMap { it.archiveFile })
+    from('../python/singleplayer_bridge/lang') { into 'assets/mcdr-singleplayer/lang' }
     inputs.property 'version', project.version
     filesMatching('fabric.mod.json') { expand version: project.version }
 }

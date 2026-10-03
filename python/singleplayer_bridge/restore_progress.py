@@ -1,5 +1,7 @@
 """Atomic, token-free restore status that survives the world socket closing."""
+from singleplayer_bridge.i18n import tr
 import contextvars
+import contextlib
 import json
 import os
 import threading
@@ -8,6 +10,17 @@ import uuid
 from pathlib import Path
 
 current_restore = contextvars.ContextVar('singleplayer_restore_progress', default=None)
+_backup_lock = threading.Lock()
+
+
+@contextlib.contextmanager
+def exclusive_backup():
+    if not _backup_lock.acquire(blocking=False):
+        raise RuntimeError(tr('error.another_backup_or_restore_task_is_running_retry_after_it_completes'))
+    try:
+        yield
+    finally:
+        _backup_lock.release()
 
 
 class RestoreProgress:
@@ -47,7 +60,16 @@ class RestoreProgress:
                 if self.path.is_symlink() or (hasattr(self.path, 'is_junction') and self.path.is_junction()):
                     raise OSError('Restore status cannot be a link')
                 temporary.write_text(json.dumps(self.data, ensure_ascii=False), encoding='utf8')
-                temporary.replace(self.path)
+                for attempt in range(10):
+                    try:
+                        temporary.replace(self.path)
+                        break
+                    except PermissionError:
+                        # Windows readers briefly prevent atomic replacement. In particular,
+                        # retry the terminal update so a completed restore cannot stay running.
+                        if attempt == 9:
+                            raise
+                        time.sleep(min(0.01 * (attempt + 1), 0.05))
             except OSError as exc:
                 # A UI reporting error must never interrupt a real restore.
                 self.logger.warning('Could not update restore status: %s', exc)

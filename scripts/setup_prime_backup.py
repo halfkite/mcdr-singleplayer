@@ -15,7 +15,7 @@ def pack_adapter(root, target):
 
 def configure(root, mcdr, world, copy_adapter=False, *, profile_dir=None):
     mcdr, world = mcdr.resolve(strict=True), world.resolve(strict=True)
-    if not (mcdr / 'runtime/config/config.yml').is_file():
+    if not (mcdr / 'config.yml').is_file():
         raise ValueError('MCDR config.yml not found')
     if not (world / 'level.dat').is_file():
         raise ValueError('Select an existing world folder containing level.dat')
@@ -26,9 +26,9 @@ def configure(root, mcdr, world, copy_adapter=False, *, profile_dir=None):
         bundle = Path(__file__).resolve().parent
         artifacts = list((bundle / 'adapters').glob('singleplayer_prime_backup-*.mcdr'))
         if not artifacts:
-            artifacts = list((root / 'dist').glob('singleplayer_prime_backup-0.3.5.mcdr'))
+            artifacts = list((root / 'dist').glob('singleplayer_prime_backup-0.3.10.mcdr'))
         if len(artifacts) != 1:
-            raise ValueError('Extract the complete 0.3.5 release bundle before running this script')
+            raise ValueError('Extract the complete 0.3.10 release bundle before running this script')
     # profile_dir is used by the isolated integration harness, whose cwd is already a profile.
     profile = profile_dir.resolve() if profile_dir is not None else mcdr / 'date' / world.name
     if profile_dir is None:
@@ -52,7 +52,7 @@ def configure(root, mcdr, world, copy_adapter=False, *, profile_dir=None):
     commands['turn_off_auto_save'] = True
     commands['commands'] = dict(auto_save_off='save-off', save_all_worlds='save-all flush', auto_save_on='save-on')
     commands['saved_world_regex'] = ['Saved the game']
-    config.setdefault('storage_root', str(profile / 'data/prime_backup'))
+    config.setdefault('storage_root', './pb_files')
     storage = Path(config['storage_root'])
     if not storage.is_absolute():
         storage = profile / storage
@@ -68,9 +68,9 @@ def configure(root, mcdr, world, copy_adapter=False, *, profile_dir=None):
     adapter_config.parent.mkdir(parents=True, exist_ok=True)
     adapter_config.write_text(json.dumps({'world_path': str(world)}, ensure_ascii=False, indent=2) + '\n', encoding='utf8')
     if copy_adapter:
-        pack_adapter(root, mcdr / 'runtime/config/plugins/singleplayer_prime_backup.mcdr')
+        pack_adapter(root, mcdr / 'plugins/singleplayer_prime_backup.mcdr')
     else:
-        shutil.copy2(artifacts[0], mcdr / 'runtime/config/plugins/singleplayer_prime_backup.mcdr')
+        shutil.copy2(artifacts[0], mcdr / 'plugins/singleplayer_prime_backup.mcdr')
     return pb_path
 
 

@@ -40,7 +40,7 @@ def test_recommendation_consent_is_independent_and_survives_reentry(tmp_path):
 
 
 def test_only_main_player_gets_owner_and_language_follows_client(tmp_path):
-    config_dir = tmp_path / 'runtime/config'; config_dir.mkdir(parents=True)
+    config_dir = tmp_path / '.'; config_dir.mkdir(parents=True, exist_ok=True)
     (config_dir / 'config.yml').write_text('language: en_us\n', encoding='utf8')
     (config_dir / 'permission.yml').write_text('default_level: user\nowner: [Existing]\nuser: [Main, Guest]\n', encoding='utf8')
     configure_host(tmp_path, 'Main', 'zh_cn')

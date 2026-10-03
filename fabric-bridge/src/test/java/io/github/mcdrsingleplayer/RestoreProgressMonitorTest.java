@@ -47,6 +47,23 @@ class RestoreProgressMonitorTest {
         assertNotNull(cancelled);
         assertFalse(cancelled.blocksWorld());
     }
+    @Test void chunkBackupRecoveryAndPlayerStagesKeepWorldLocked() throws Exception {
+        Path path = directory.resolve(".mcdr_restore_progress.json");
+        try (var monitor = new RestoreProgressMonitor(path)) {
+            monitor.session("current-world");
+            for (String stage : java.util.List.of("rolling_back", "player_data")) {
+                var record = status("running", true);
+                record.addProperty("stage", stage);
+                record.add("backup_id", com.google.gson.JsonNull.INSTANCE);
+                Files.writeString(path, record.toString());
+                assertTrue(RestoreProgressMonitor.blocks("World"));
+                assertEquals(stage, monitor.current().stage());
+                assertEquals(0, monitor.current().backup());
+            }
+            Files.writeString(path, status("failed", true).toString());
+            assertTrue(RestoreProgressMonitor.blocks("World"));
+        }
+    }
     @Test void deferredMigrationReadsBothLockFilesAndWritesOnlyToCanonicalRoot() throws Exception {
         Path legacy = directory.resolve("config/.mcdr_restore_progress.json");
         Files.createDirectories(legacy.getParent());

@@ -10,9 +10,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_binding_preserves_prior_config_and_storage_without_touching_save(tmp_path):
     mcdr = tmp_path / 'mcdr'; mcdr.mkdir()
-    (mcdr / 'runtime/config').mkdir(parents=True)
-    (mcdr / 'runtime/config/config.yml').write_text('test')
-    (mcdr / 'runtime/config/plugins').mkdir()
+    (mcdr / '.').mkdir(parents=True, exist_ok=True)
+    (mcdr / 'config.yml').write_text('test')
+    (mcdr / 'plugins').mkdir()
     world = tmp_path / 'saves' / '测试世界'; world.mkdir(parents=True)
     (world / 'level.dat').write_bytes(b'world-do-not-change')
     pb = mcdr / 'date' / world.name / 'config/prime_backup/config.json'; pb.parent.mkdir(parents=True)
@@ -30,16 +30,16 @@ def test_binding_preserves_prior_config_and_storage_without_touching_save(tmp_pa
     prior = list(pb.parent.glob('config.before-singleplayer-*.json'))
     assert len(prior) == 1 and json.loads(prior[0].read_text()) == original
     assert (world / 'level.dat').read_bytes() == b'world-do-not-change'
-    assert (mcdr / 'runtime/config/plugins/singleplayer_prime_backup.mcdr').is_file()
+    assert (mcdr / 'plugins/singleplayer_prime_backup.mcdr').is_file()
 
 
 def test_missing_adapter_release_is_rejected_before_config_is_changed(tmp_path):
     mcdr = tmp_path / 'mcdr'; mcdr.mkdir()
-    (mcdr / 'runtime/config').mkdir(parents=True)
-    (mcdr / 'runtime/config/config.yml').write_text('test')
+    (mcdr / '.').mkdir(parents=True, exist_ok=True)
+    (mcdr / 'config.yml').write_text('test')
     world = tmp_path / 'world'; world.mkdir()
     (world / 'level.dat').write_bytes(b'test')
     # No bundled artifacts and no release in this intentionally empty source root.
-    with pytest.raises(ValueError, match='complete 0.3.5 release'):
+    with pytest.raises(ValueError, match='complete 0.3.10 release'):
         configure(tmp_path / 'empty-source', mcdr, world)
     assert not (mcdr / 'date/prime_backup/config.json').exists()

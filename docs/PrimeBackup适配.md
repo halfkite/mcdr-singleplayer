@@ -1,14 +1,14 @@
-> 0.3.5 默认自动安装并启用 Prime Backup 1.13.1，进入存档后提示选择备份总开关、4 小时自动备份和自动清理，主玩家自动获得 owner 权限。主菜单显示回档阶段，完成前不能进入目标存档；重新进入时自动连接。详情见 [自动启动与存档配置](自动启动与存档配置.md)。下文的手工绑定步骤用于关闭自动启动后的手动模式。
+> 0.3.9 首次进入存档后可点击安装 Prime Backup 1.13.1；已有 PB 跳过安装推荐。安装成功或 PB 已加载时，显示备份总开关、4 小时自动备份、自动清理和官方文档按钮，主玩家自动获得 owner 权限。主菜单显示回档阶段，完成前不能进入目标存档；重新进入时自动连接。详情见 [自动启动与存档配置](自动启动与存档配置.md)。下文的手工绑定步骤用于关闭自动启动后的手动模式。
 
 # Prime Backup 1.13.1：26.3 Fabric 单人适配
 
-使用桥接 0.3.5 和独立的 `singleplayer_prime_backup` 适配插件。Prime Backup 使用官方原版 **1.13.1**，无需改动其 `.pyz`。适配插件严格绑定一个存档，并接管 Prime Backup 的备份创建和回档任务；其他插件的 MCDR `stop` 仍只断开桥接。
+使用桥接 0.3.9 和独立的 `singleplayer_prime_backup` 适配插件。Prime Backup 使用官方原版 **1.13.1**，无需改动其 `.pyz`。适配插件严格绑定一个存档，并接管 Prime Backup 的备份创建和回档任务；其他插件的 MCDR `stop` 仍只断开桥接。
 
 官方插件：[Prime Backup](https://mcdreforged.com/zh-CN/plugin/prime_backup)。官方配置说明：[快速上手](https://tisunion.github.io/PrimeBackup/zh/quick_start/)。
 
 ## 安装
 
-1. 按本包的《安装说明》升级游戏端 JAR、MCDR 插件和 `bridge-runtime`，三者都使用 **0.3.5**。旧版 JAR/桥接插件应移出 mods/plugins，避免重复 ID。
+1. 按本包的《安装说明》升级游戏端 JAR、MCDR 插件和 `bridge-runtime`，三者都使用 **0.3.9**。旧版 JAR/桥接插件应移出 mods/plugins，避免重复 ID。
 2. 从 [官方发布页](https://github.com/TISUnion/PrimeBackup/releases/tag/v1.13.1) 下载 `PrimeBackup-v1.13.1.pyz`，放入 MCDR 的 `plugins`。本包不重新分发 Prime Backup。
 3. 关闭 MCDR，使用运行 MCDR 的同一个 Python 安装依赖，并绑定现有单人存档：
 
@@ -17,7 +17,7 @@ python -m pip install -r .\requirements-prime-backup.txt
 python .\setup_prime_backup.py --mcdr-dir 'D:\Minecraft\实例目录\mcdr-singleplayer' --world-dir 'D:\Minecraft\实例目录\saves\你的存档目录'
 ```
 
-在解压完整安装包的目录执行以上命令。存档目录需包含 `level.dat`。脚本复制适配插件到 MCDR 的 `plugins`，配置 Prime Backup 的 `source_root` 和 `targets`，并启用 `save-off / save-all flush / save-on`；已有 Prime Backup 配置会先按时间保存副本。配置保存在 `mcdr-singleplayer/date/<存档文件夹名>/config/prime_backup/config.json`，备份存储必须在该分类目录中。MCDR 共用设置与插件位于 `mcdr-singleplayer/runtime/config/`。其他配置项保持原值；0.3.3 自动模式的已有数据库由目录迁移流程复制到新分类目录并重新绑定。
+在解压完整安装包的目录执行以上命令。存档目录需包含 `level.dat`。脚本复制适配插件到 MCDR 的 `plugins`，配置 Prime Backup 的 `source_root` 和 `targets`，并启用 `save-off / save-all flush / save-on`；已有 Prime Backup 配置会先按时间保存副本。配置保存在 `mcdr-singleplayer/date/<存档文件夹名>/config/prime_backup/config.json`，备份存储必须在该分类目录中。MCDR 共用设置与插件位于 `mcdr-singleplayer/`。其他配置项保持原值；0.3.3 自动模式的已有数据库由目录迁移流程复制到新分类目录并重新绑定。
 
 共用 MCDR 目录必须是所属游戏实例的 `mcdr-singleplayer/`；手动启动使用《安装说明》生成的脚本，工作目录是 `date/<存档文件夹名>/`。
 

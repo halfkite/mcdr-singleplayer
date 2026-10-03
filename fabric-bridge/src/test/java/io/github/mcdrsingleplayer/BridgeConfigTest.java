@@ -19,8 +19,39 @@ class BridgeConfigTest {
     @Test void freshConfigExistsOnlyInDedicatedRoot() throws Exception {
         var config = BridgeConfig.loadForGame(game);
         assertEquals(64, config.token.length());
-        assertTrue(Files.isRegularFile(game.resolve("mcdr-singleplayer/runtime/config/config.json")));
+        assertTrue(Files.isRegularFile(game.resolve("mcdr-singleplayer/config.json")));
         assertFalse(Files.exists(game.resolve("config")));
+    }
+
+    @Test void pythonOnboardingPreferencesSurviveClientRestart() throws Exception {
+        var initial = BridgeConfig.loadForGame(game);
+        Path path = BridgeConfig.pathForGame(game);
+        var saved = JsonParser.parseString(Files.readString(path)).getAsJsonObject();
+        saved.addProperty("onboardingDismissed", true);
+        saved.addProperty("onboardingLastClientId", "last-client");
+        Files.writeString(path, saved.toString());
+        var reopened = BridgeConfig.loadForGame(game);
+        assertTrue(reopened.onboardingDismissed);
+        assertEquals("last-client", reopened.onboardingLastClientId);
+        assertEquals(initial.token, reopened.token);
+        assertTrue(JsonParser.parseString(Files.readString(path)).getAsJsonObject().get("onboardingDismissed").getAsBoolean());
+    }
+
+    @Test void previousRuntimeConfigMovesToSharedRootAndKeepsToken() throws Exception {
+        Path root = game.resolve("mcdr-singleplayer");
+        Path previous = root.resolve("runtime/config");
+        BridgeConfig old = BridgeConfig.load(previous.resolve("config.json"));
+        Files.createDirectories(previous.resolve("plugins"));
+        Files.writeString(previous.resolve("plugins/probe.py"), "plugin");
+        Files.writeString(previous.resolve("config.yml"), "user-config");
+        Files.writeString(previous.resolve("permission.yml"), "owner");
+        var current = BridgeConfig.loadForGame(game);
+        assertEquals(old.token, current.token);
+        assertFalse(Files.exists(previous));
+        assertEquals("plugin", Files.readString(root.resolve("plugins/probe.py")));
+        assertEquals("owner", Files.readString(root.resolve("permission.yml")));
+        assertEquals("user-config", Files.readString(root.resolve("config.yml")));
+        assertEquals(old.token, BridgeConfig.loadForGame(game).token);
     }
 
     @Test void legacyConfigAndRestoreLocksMoveWithoutChangingToken() throws Exception {
@@ -36,7 +67,7 @@ class BridgeConfigTest {
         assertFalse(Files.exists(game.resolve("config/.mcdr_restore_locks.json")));
         Path root = game.resolve("mcdr-singleplayer");
         assertEquals("[\"Old World\"]", Files.readString(root.resolve("runtime/.mcdr_restore_locks.json")));
-        assertFalse(Files.readString(root.resolve("runtime/config/config.json")).contains("mcdrDirectory"));
+        assertFalse(Files.readString(root.resolve("config.json")).contains("mcdrDirectory"));
         assertEquals(common.toString(), JsonParser.parseString(Files.readString(root.resolve("runtime/.legacy-layout.json"))).getAsJsonObject().get("source").getAsString());
     }
 
@@ -48,9 +79,9 @@ class BridgeConfigTest {
         Files.writeString(root.resolve("data/Old World/keep.txt"), "profile");
         var config = BridgeConfig.loadForGame(game);
         assertEquals(25591, config.port);
-        assertEquals("language: en_us\n", Files.readString(root.resolve("runtime/config/config.yml")));
+        assertEquals("language: en_us\n", Files.readString(root.resolve("config.yml")));
         assertEquals("profile", Files.readString(root.resolve("date/Old World/keep.txt")));
-        assertFalse(Files.exists(root.resolve("config.json")));
+        assertTrue(Files.exists(root.resolve("config.json")));
         assertFalse(Files.exists(root.resolve("data")));
     }
 
@@ -69,10 +100,11 @@ class BridgeConfigTest {
         var current = BridgeConfig.load(path);
         current.port = 25590;
         Files.writeString(path, new com.google.gson.Gson().toJson(current));
-        Files.writeString(path.getParent().getParent().resolve(".mcdr_restore_locks.json"), "[\"New World\"]");
+        Files.createDirectories(path.getParent().resolve("runtime"));
+        Files.writeString(path.getParent().resolve("runtime/.mcdr_restore_locks.json"), "[\"New World\"]");
         Files.writeString(game.resolve("config/.mcdr_restore_locks.json"), "[\"Old World\"]");
         assertEquals(25590, BridgeConfig.loadForGame(game).port);
-        var locks = JsonParser.parseString(Files.readString(path.getParent().getParent().resolve(".mcdr_restore_locks.json"))).getAsJsonArray();
+        var locks = JsonParser.parseString(Files.readString(path.getParent().resolve("runtime/.mcdr_restore_locks.json"))).getAsJsonArray();
         assertEquals(2, locks.size());
         assertFalse(Files.exists(game.resolve("config/mcdr_singleplayer_bridge.json")));
     }

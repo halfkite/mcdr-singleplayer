@@ -20,3 +20,15 @@ def test_retirement_waits_for_backup_work_and_then_detaches(monkeypatch):
     busy.clear()
     assert retired.wait(2)
     assert calls == ['stop', 'wait', 'exit']
+
+
+def test_chunk_queue_keeps_profile_alive_after_world_disconnect(monkeypatch):
+    busy = threading.Event()
+    busy.set()
+    queue = SimpleNamespace(unfinished_size=lambda: int(busy.is_set()))
+    manager = SimpleNamespace(worker_heavy=SimpleNamespace(task_queue=queue), worker_light=SimpleNamespace(task_queue=queue))
+    server = SimpleNamespace(get_plugin_instance=lambda name: SimpleNamespace(task_manager=manager))
+    monkeypatch.setattr(plugin, '_server', server)
+    assert plugin.prime_busy()
+    busy.clear()
+    assert not plugin.prime_busy()

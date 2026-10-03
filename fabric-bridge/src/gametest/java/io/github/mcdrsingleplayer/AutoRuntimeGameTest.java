@@ -22,7 +22,7 @@ public final class AutoRuntimeGameTest implements FabricClientGameTest {
         if (commonPath == null) return;
         Path game = FabricLoader.getInstance().getGameDir().toAbsolutePath();
         Path common = game.resolve("mcdr-singleplayer");
-        BridgeGameTest.check(Files.isRegularFile(common.resolve("runtime/config/config.json")), "Mod config is outside runtime/config folder");
+        BridgeGameTest.check(Files.isRegularFile(common.resolve("config.json")), "Mod config is outside shared root");
         BridgeGameTest.check(Files.isDirectory(common.resolve("runtime")) && Files.isDirectory(common.resolve("log")), "Runtime and log folders are missing");
         BridgeGameTest.check(!Files.exists(game.resolve("config/mcdr_singleplayer_bridge.json")), "Legacy mod config was recreated");
         BridgeGameTest.check(!Files.exists(common.resolve("worlds")), "Profile layout still has a worlds intermediate folder");
@@ -43,12 +43,19 @@ public final class AutoRuntimeGameTest implements FabricClientGameTest {
         int controllersBefore = PrimeBackupGameTest.count(controllerLog, "Controller ready;");
         int profilesBefore = PrimeBackupGameTest.count(controllerLog, "MCDR profile started:");
         try {
-            Files.createDirectories(common.resolve("runtime/config/plugins"));
-            Files.writeString(common.resolve("runtime/config/plugins/test_command_probe.py"), """
+            Files.createDirectories(common.resolve("plugins"));
+            if (System.getenv("MCDR_BRIDGE_TEST_PREINSTALLED") != null) {
+                // Fabric rebuilds this test's game directory on every invocation.
+                // Seed upstream files inside the fixture to exercise an existing installation.
+                Path reference = Path.of(System.getenv("MCDR_BRIDGE_TEST_ROOT")).resolve(".reference");
+                for (String name : new String[]{"PrimeBackup-v1.13.1.pyz", "Chunk_BackUp-v2.0.3.mcdr", "Candy_Tools-v1.0.2.mcdr"})
+                    Files.copy(reference.resolve(name), common.resolve("plugins").resolve(name));
+            }
+            Files.writeString(common.resolve("plugins/test_command_probe.py"), """
                 from mcdreforged.api.command import Literal, QuotableText
                 import os, time
                 from pathlib import Path
-                PLUGIN_METADATA = {'id': 'test_command_probe', 'version': '1.0.0', 'dependencies': {'prime_backup': '==1.13.1', 'singleplayer_prime_backup': '==0.3.5'}}
+                PLUGIN_METADATA = {'id': 'test_command_probe', 'version': '1.0.0', 'dependencies': {'prime_backup': '==1.13.1', 'singleplayer_prime_backup': '==0.3.10'}}
                 _export = None
                 ExportBackupToDirectoryAction = None
                 def on_load(server, previous):
@@ -73,21 +80,48 @@ public final class AutoRuntimeGameTest implements FabricClientGameTest {
         context.waitFor(client -> PrimeBackupGameTest.count(controllerLog, "Controller ready;") > controllersBefore, 18000);
         BridgeGameTest.check(PrimeBackupGameTest.count(controllerLog, "MCDR profile started:") == profilesBefore, "A world profile started at the menu");
         String oldLanguage = context.computeOnClient(client -> client.getLanguageManager().getSelected());
-        context.runOnClient(client -> client.getLanguageManager().setSelected("zh_cn"));
+        var languageReload = context.computeOnClient(client -> {
+            client.getLanguageManager().setSelected("zh_cn");
+            return client.reloadResourcePacks();
+        });
+        context.waitFor(client -> languageReload.isDone(), 2400);
         var world = context.worldBuilder().create();
         try {
             Path save = world.getWorldSave().getSaveDirectory().toAbsolutePath();
             Path profile = common.resolve("date").resolve(save.getFileName());
             Path log = common.resolve("log").resolve(profile.getFileName()).resolve("controller-child.log");
-            int readyBefore = PrimeBackupGameTest.count(log, "Singleplayer world ready");
-            context.waitFor(client -> PrimeBackupGameTest.count(log, "Singleplayer world ready") > readyBefore, 2400);
+            // A new world has its own log; the controller can be ready before create() returns.
+            context.waitFor(client -> PrimeBackupGameTest.contains(log, "Singleplayer world ready"), 2400);
+            context.waitFor(client -> ClientCommands.getActiveDispatcher().getRoot().getChild("!!spbridge") != null, 1800);
+            if (!Files.exists(common.resolve("plugins/PrimeBackup-v1.13.1.pyz"))) {
+                context.waitFor(client -> clicks.contains("/!!spbridge install prime_backup") && clicks.contains("/!!spbridge install chunk_backup"), 1800);
+                BridgeGameTest.check(messages.stream().filter(s -> s.contains("注意！！！ 本模组处于初步测试阶段")).count() == 3, "First-run warning was not repeated three times");
+                BridgeGameTest.check(!clicks.contains("/!!spbridge config backup on"), "PB controls shown before installation");
+                context.takeScreenshot("onboarding-first-install");
+                context.runOnClient(client -> client.player.connection.sendCommand("!!spbridge install prime_backup"));
+                context.waitFor(client -> messages.stream().anyMatch(s -> s.contains("prime_backup 已安装并加载")), 6000);
+                // MCDR unloads this test-only probe when PB is absent at startup.
+                context.runOnClient(client -> client.player.connection.sendCommand("!!MCDR plugin load test_command_probe.py"));
+            }
             context.waitFor(client -> ClientCommands.getActiveDispatcher().getRoot().getChild("!!extra") != null, 1800);
-            BridgeGameTest.check(Files.readString(common.resolve("runtime/config/permission.yml")).contains("- " + context.computeOnClient(client -> client.player.getPlainTextName())), "Main player not automatically granted owner");
-            BridgeGameTest.check(Files.readString(common.resolve("runtime/config/config.yml")).contains("language: zh_cn"), "MCDR language did not follow client");
+            BridgeGameTest.check(Files.readString(common.resolve("permission.yml")).contains("- " + context.computeOnClient(client -> client.player.getPlainTextName())), "Main player not automatically granted owner");
+            BridgeGameTest.check(Files.readString(common.resolve("config.yml")).contains("language: zh_cn"), "MCDR language did not follow client");
             var initial = config(profile);
             BridgeGameTest.check(initial.get("enabled").getAsBoolean() && !initial.getAsJsonObject("scheduled_backup").get("enabled").getAsBoolean() && !initial.getAsJsonObject("prune").get("enabled").getAsBoolean(), "Default PB consent incorrect");
-            context.waitFor(client -> clicks.contains("/!!spbridge config backup on") && clicks.contains("/!!spbridge config backup off") && clicks.contains("/!!spbridge config auto_backup on") && clicks.contains("/!!spbridge config auto_delete on"), 1800);
+            context.waitFor(client -> clicks.contains("/!!spbridge config backup on") && clicks.contains("/!!spbridge config auto_backup on") && clicks.contains("/!!spbridge config auto_delete on"), 1800);
+            if (System.getenv("MCDR_BRIDGE_TEST_PREINSTALLED") != null) {
+                BridgeGameTest.check(!clicks.contains("/!!spbridge install prime_backup") && !clicks.contains("/!!spbridge install chunk_backup"), "Existing plugins still showed installation buttons");
+                BridgeGameTest.check(messages.stream().filter(s -> s.contains("注意！！！ 本模组处于初步测试阶段")).count() == 3, "Existing installation lost first-run warnings");
+            }
             context.takeScreenshot("recommendation-click-options");
+            if (!Files.exists(common.resolve("plugins/Chunk_BackUp-v2.0.3.mcdr"))) {
+                context.runOnClient(client -> client.player.connection.sendCommand("!!spbridge install chunk_backup"));
+                context.waitFor(client -> messages.stream().anyMatch(s -> s.contains("chunk_backup 已安装并加载")), 6000);
+                context.waitFor(client -> ClientCommands.getActiveDispatcher().getRoot().getChild("!!cb") != null, 1800);
+                BridgeGameTest.check(Files.exists(profile.resolve("cb_files/.singleplayer-world.json")), "CB install did not bind current save");
+            }
+            context.runOnClient(client -> client.player.connection.sendCommand("!!spbridge onboarding dismiss"));
+            context.waitFor(client -> messages.stream().anyMatch(s -> s.contains("已忽略，以后不再主动提示")), 1800);
             context.runOnClient(client -> client.player.connection.sendUnattendedCommand("!!spbridge config backup off", null));
             context.waitFor(client -> messages.stream().anyMatch(s -> s.contains("备份已关闭")), 1800);
             BridgeGameTest.check(!config(profile).get("enabled").getAsBoolean(), "Backup disable choice not saved");
@@ -117,7 +151,7 @@ public final class AutoRuntimeGameTest implements FabricClientGameTest {
             context.waitFor(client -> ClientCommands.getActiveDispatcher().getRoot().getChild("!!extra") == null, 1200);
             context.runOnClient(client -> client.player.connection.sendCommand("!!MCDR plugin load test_command_probe.py"));
             context.waitFor(client -> ClientCommands.getActiveDispatcher().getRoot().getChild("!!extra") != null, 1200);
-            Path probe = common.resolve("runtime/config/plugins/test_command_probe.py");
+            Path probe = common.resolve("plugins/test_command_probe.py");
             Files.writeString(probe, Files.readString(probe).replace("Literal('leaf')", "Literal('changed')"));
             context.runOnClient(client -> client.player.connection.sendCommand("!!MCDR plugin reload test_command_probe"));
             context.waitFor(client -> ClientCommands.getActiveDispatcher().getRoot().getChild("!!extra").getChild("nested").getChild("changed") != null, 1200);
@@ -156,10 +190,13 @@ public final class AutoRuntimeGameTest implements FabricClientGameTest {
             context.waitFor(client -> RestoreProgressMonitor.instance.visible() == null && net.fabricmc.fabric.api.client.screen.v1.Screens.getWidgets(client.gui.screen()).stream().anyMatch(widget -> widget.visible && widget.active), 100);
             context.waitFor(client -> PrimeBackupGameTest.contains(log, "bye"), 1200);
             BridgeGameTest.check("before".equals(Files.readString(save.resolve("auto-test-marker.txt"))), "Automatic profile restore failed");
+            int warningsBeforeReentry = (int) messages.stream().filter(s -> s.contains("注意！！！ 本模组处于初步测试阶段")).count();
             var reopened = world.getWorldSave().open();
             try {
                 context.waitFor(client -> PrimeBackupGameTest.count(log, "Singleplayer world ready") >= 2, 2400);
                 BridgeGameTest.check(reopened.getServer().computeOnServer(server -> server.overworld().getBlockState(new BlockPos(2, -60, 2)).is(Blocks.DIAMOND_BLOCK)), "Automatic reopen did not restore blocks");
+                context.waitTicks(30);
+                BridgeGameTest.check(messages.stream().filter(s -> s.contains("注意！！！ 本模组处于初步测试阶段")).count() == warningsBeforeReentry, "Dismissed onboarding repeated on reentry");
                 context.takeScreenshot("automatic-profile-restored");
             } finally { reopened.close(); }
             context.waitFor(client -> PrimeBackupGameTest.count(log, "bye") >= 2, 1200);
@@ -182,7 +219,11 @@ public final class AutoRuntimeGameTest implements FabricClientGameTest {
         } catch (IOException e) { throw new AssertionError(e); }
         finally {
             bridge.setTestCloseDispatcher(null);
-            context.runOnClient(client -> client.getLanguageManager().setSelected(oldLanguage));
+            var resetLanguage = context.computeOnClient(client -> {
+                client.getLanguageManager().setSelected(oldLanguage);
+                return client.reloadResourcePacks();
+            });
+            context.waitFor(client -> resetLanguage.isDone(), 2400);
             if (context.computeOnClient(client -> client.level != null)) world.close();
         }
     }
@@ -193,8 +234,8 @@ public final class AutoRuntimeGameTest implements FabricClientGameTest {
     }
 
     private static boolean emptyBackups(Path common, Path profile) throws IOException {
-        Path database = profile.resolve("data/prime_backup/backup.db");
-        if (!Files.exists(database)) return true;
+        Path database = profile.resolve("pb_files/prime_backup.db");
+        BridgeGameTest.check(Files.isRegularFile(database), "PB database did not use its native pb_files directory");
         var process = new ProcessBuilder(common.resolve("runtime/.bridge-venv/Scripts/python.exe").toString(), "-c",
             "import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute('select count(*) from backup').fetchone()[0])", database.toString()).start();
         try {

@@ -1,0 +1,179 @@
+{
+  "modVersion": "0.3.10",
+  "date": "2026-10-03",
+  "pythonTests": 108,
+  "javaTests": 20,
+  "compiledAdapters": 34,
+  "clientTests": [
+    {
+      "success": true,
+      "game": "1.21.1",
+      "loader": "fabric",
+      "command_tree": true,
+      "backup": true,
+      "restore": true,
+      "reopen": true,
+      "testDirectory": "build/smoke/fabric/1.21.1/run-20261003-152138",
+      "events": [
+        "phase 1",
+        "phase 2",
+        "command-tree: !!pb make registered",
+        "phase 3",
+        "backup: completed",
+        "phase 4",
+        "phase 5",
+        "restore: title menu reached, world locked until complete, marker restored",
+        "phase 6",
+        "reopen: restored world entered",
+        "phase 7",
+        "PASS"
+      ]
+    },
+    {
+      "success": true,
+      "game": "1.21.11",
+      "loader": "fabric",
+      "command_tree": true,
+      "backup": true,
+      "restore": true,
+      "reopen": true,
+      "testDirectory": "build/smoke/fabric/1.21.11/run-20261003-152325",
+      "events": [
+        "phase 1",
+        "phase 2",
+        "command-tree: !!pb make registered",
+        "phase 3",
+        "backup: completed",
+        "phase 4",
+        "phase 5",
+        "restore: title menu reached, world locked until complete, marker restored",
+        "phase 6",
+        "reopen: restored world entered",
+        "phase 7",
+        "PASS"
+      ]
+    },
+    {
+      "success": true,
+      "game": "26.3",
+      "loader": "fabric",
+      "command_tree": true,
+      "backup": true,
+      "restore": true,
+      "reopen": true,
+      "testDirectory": "build/smoke/fabric/26.3/run-20261003-152527",
+      "events": [
+        "phase 1",
+        "phase 2",
+        "command-tree: !!pb make registered",
+        "phase 3",
+        "backup: completed",
+        "phase 4",
+        "phase 5",
+        "restore: title menu reached, world locked until complete, marker restored",
+        "phase 6",
+        "reopen: restored world entered",
+        "phase 7",
+        "PASS"
+      ]
+    },
+    {
+      "success": true,
+      "game": "1.21.1",
+      "loader": "neoforge",
+      "command_tree": true,
+      "backup": true,
+      "restore": true,
+      "reopen": true,
+      "testDirectory": "build/smoke/neoforge/1.21.1/run-20261003-152651",
+      "events": [
+        "phase 1",
+        "phase 2",
+        "command-tree: !!pb make registered",
+        "phase 3",
+        "backup: completed",
+        "phase 4",
+        "phase 5",
+        "restore: title menu reached, world locked until complete, marker restored",
+        "phase 6",
+        "reopen: restored world entered",
+        "phase 7",
+        "PASS"
+      ]
+    },
+    {
+      "success": true,
+      "game": "1.21.11",
+      "loader": "neoforge",
+      "command_tree": true,
+      "backup": true,
+      "restore": true,
+      "reopen": true,
+      "testDirectory": "build/smoke/neoforge/1.21.11/run-20261003-152651",
+      "events": [
+        "phase 1",
+        "phase 2",
+        "command-tree: !!pb make registered",
+        "phase 3",
+        "backup: completed",
+        "phase 4",
+        "phase 5",
+        "restore: title menu reached, world locked until complete, marker restored",
+        "phase 6",
+        "reopen: restored world entered",
+        "phase 7",
+        "PASS"
+      ]
+    },
+    {
+      "success": true,
+      "game": "26.3",
+      "loader": "neoforge",
+      "command_tree": true,
+      "backup": true,
+      "restore": true,
+      "reopen": true,
+      "testDirectory": "build/smoke/neoforge/26.3/run-20261003-152538",
+      "events": [
+        "phase 1",
+        "phase 2",
+        "command-tree: !!pb make registered",
+        "phase 3",
+        "backup: completed",
+        "phase 4",
+        "phase 5",
+        "restore: title menu reached, world locked until complete, marker restored",
+        "phase 6",
+        "reopen: restored world entered",
+        "phase 7",
+        "PASS"
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "file": "mcdr-singleplayer-0.3.10+fabric+mc1.21.x.jar",
+      "sha256": "bbb197b38053562f91d5a0c040a3300d58fa93c8e26b3d33705b7da3048ec175",
+      "bytes": 834338
+    },
+    {
+      "file": "mcdr-singleplayer-0.3.10+fabric+mc26.x.jar",
+      "sha256": "82c1c32568552e2a2dda4d27b85271a1035da910dd75d728cb34e65db621b63d",
+      "bytes": 426369
+    },
+    {
+      "file": "mcdr-singleplayer-0.3.10+neoforge+mc1.21.x.jar",
+      "sha256": "c9413405836823016304338a633f10a6d4842c63a44bcf7cfc79aa6274646d27",
+      "bytes": 948587
+    },
+    {
+      "file": "mcdr-singleplayer-0.3.10+neoforge+mc26.x.jar",
+      "sha256": "576e778f2d8753cb7ddb550cd74396903081653276abedc8995c79c93bc55bc5",
+      "bytes": 477679
+    }
+  ],
+  "pythonTestBreakdown": {
+    "core": 102,
+    "release": 6
+  }
+}

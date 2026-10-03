@@ -43,6 +43,24 @@ def test_invalid_status_destination_cannot_overwrite_other_files(tmp_path):
     assert path.read_bytes() == b'world'
 
 
+def test_terminal_progress_retries_transient_windows_read_lock(tmp_path, monkeypatch):
+    path = tmp_path / '.mcdr_restore_progress.json'
+    progress = RestoreProgress({'progress_path': str(path), 'session': 's'}, tmp_path / 'world', 1, logging.getLogger('test'))
+    progress.update('restoring')
+    replace = Path.replace
+    attempts = []
+    def locked(source, target):
+        attempts.append(1)
+        if len(attempts) < 3:
+            raise PermissionError('UI reader has the status file open')
+        return replace(source, target)
+    monkeypatch.setattr(Path, 'replace', locked)
+    progress.exported = True
+    progress.finish()
+    assert len(attempts) == 3 and json.loads(path.read_text())['status'] == 'completed'
+    assert not list(tmp_path.glob('*.tmp'))
+
+
 def test_real_adapter_hooks_publish_action_stages_and_failure(monkeypatch, tmp_path):
     import sys
     import singleplayer_prime_backup as adapter

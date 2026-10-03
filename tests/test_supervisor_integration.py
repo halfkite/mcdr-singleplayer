@@ -28,23 +28,23 @@ def wait(predicate, timeout=20):
 def test_controller_waits_switches_profiles_and_preserves_shared_files(tmp_path):
     common = tmp_path / 'common'
     common.mkdir()
-    (common / 'runtime/config').mkdir(parents=True)
-    subprocess.run([sys.executable, '-m', 'mcdreforged', 'init'], cwd=common / 'runtime/config', check=True, capture_output=True)
+    (common / '.').mkdir(parents=True, exist_ok=True)
+    subprocess.run([sys.executable, '-m', 'mcdreforged', 'init'], cwd=common / '.', check=True, capture_output=True)
     configure_common(common, Path(sys.executable), ROOT / 'python')
     # Player joins register previously unknown names in MCDR's shared permission file.
     from ruamel.yaml import YAML
     yaml = YAML()
-    permission = yaml.load((common / 'runtime/config/permission.yml').read_text(encoding='utf8'))
+    permission = yaml.load((common / 'permission.yml').read_text(encoding='utf8'))
     permission['user'] = ['Steve']
-    with (common / 'runtime/config/permission.yml').open('w', encoding='utf8') as output:
+    with (common / 'permission.yml').open('w', encoding='utf8') as output:
         yaml.dump(permission, output)
     bridge_source = tmp_path / 'bridge-plugin'
     shutil.copytree(ROOT / 'python/singleplayer_bridge', bridge_source / 'singleplayer_bridge', ignore=shutil.ignore_patterns('__pycache__'))
     shutil.copy2(ROOT / 'python/mcdreforged.plugin.json', bridge_source / 'mcdreforged.plugin.json')
-    pack(bridge_source, common / 'runtime/config/plugins/singleplayer_bridge.mcdr')
-    pack(ROOT / 'prime-backup-adapter', common / 'runtime/config/plugins/singleplayer_prime_backup.mcdr')
-    shutil.copy2(ROOT / '.reference/PrimeBackup-v1.13.1.pyz', common / 'runtime/config/plugins/PrimeBackup.pyz')
-    (common / 'runtime/config/plugins/profile_probe.py').write_text('''from pathlib import Path
+    pack(bridge_source, common / 'plugins/singleplayer_bridge.mcdr')
+    pack(ROOT / 'prime-backup-adapter', common / 'plugins/singleplayer_prime_backup.mcdr')
+    shutil.copy2(ROOT / '.reference/PrimeBackup-v1.13.1.pyz', common / 'plugins/PrimeBackup.pyz')
+    (common / 'plugins/profile_probe.py').write_text('''from pathlib import Path
 import json
 PLUGIN_METADATA = {'id': 'profile_probe', 'version': '1.0.0'}
 def on_load(server, previous):
@@ -55,7 +55,7 @@ def on_load(server, previous):
     path.write_text(json.dumps(state))
     server.logger.info('PROFILE_PROBE_READY ' + str(state['loads']))
 ''', encoding='utf8')
-    shared_before = {name: hashlib.sha256((common / 'runtime/config' / name).read_bytes()).hexdigest() for name in ('config.yml', 'permission.yml')}
+    shared_before = {name: hashlib.sha256((common / '.' / name).read_bytes()).hexdigest() for name in ('config.yml', 'permission.yml')}
     listener = socket.socket()
     listener.bind(('127.0.0.1', 0))
     listener.listen()
@@ -86,7 +86,7 @@ def on_load(server, previous):
             expected = 2 if index == 2 else 1
             wait(lambda: read_json(profile / 'config/profile_probe/state.json')['loads'] == expected)
             log = common / 'log' / profile.name / 'controller-child.log'
-            wait(lambda: 'singleplayer_prime_backup@0.3.5 loaded' in log.read_text(encoding='utf8'))
+            wait(lambda: 'singleplayer_prime_backup@0.3.10 loaded' in log.read_text(encoding='utf8'))
             assert (common / 'log' / profile.name / 'MCDR.log').is_file()
             assert 'Fail to load' not in log.read_text(encoding='utf8')
             connection.sendall(encode_frame(dict(type='world_stopped', session=session)))
@@ -98,7 +98,7 @@ def on_load(server, previous):
             wait(stopped)
         assert read_json(common / 'date/世界 B/config/profile_probe/state.json')['loads'] == 1
         for name, digest in shared_before.items():
-            assert hashlib.sha256((common / 'runtime/config' / name).read_bytes()).hexdigest() == digest
+            assert hashlib.sha256((common / '.' / name).read_bytes()).hexdigest() == digest
     finally:
         for connection in connections:
             connection.close()
