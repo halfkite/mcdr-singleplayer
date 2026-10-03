@@ -6,6 +6,6 @@
   "environment": "client",
   "license": "MIT",
   "entrypoints": {
-    "fabric-client-gametest": ["io.github.mcdrsingleplayer.BridgeGameTest", "io.github.mcdrsingleplayer.PrimeBackupGameTest", "io.github.mcdrsingleplayer.ChunkBackupGameTest", "io.github.mcdrsingleplayer.AutoRuntimeGameTest", "io.github.mcdrsingleplayer.LanguageGameTest"]
+    "fabric-client-gametest": ["io.github.mcdrsingleplayer.BridgeGameTest", "io.github.mcdrsingleplayer.PrimeBackupGameTest", "io.github.mcdrsingleplayer.ChunkBackupGameTest", "io.github.mcdrsingleplayer.AutoRuntimeGameTest", "io.github.mcdrsingleplayer.LanguageGameTest", "io.github.mcdrsingleplayer.InstallProgressGameTest"]
   }
 }

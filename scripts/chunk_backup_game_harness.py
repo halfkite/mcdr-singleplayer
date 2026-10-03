@@ -42,7 +42,7 @@ from pathlib import Path
 from mcdreforged.api.command import Literal
 from mcdreforged.api.command import Text
 from mcdreforged.api.decorator import new_thread
-PLUGIN_METADATA = {'id': 'chunk_test_gate', 'version': '1.0.0', 'dependencies': {'singleplayer_chunk_backup': '==0.4.0'}}
+PLUGIN_METADATA = {'id': 'chunk_test_gate', 'version': '1.0.0', 'dependencies': {'singleplayer_chunk_backup': '==0.4.1'}}
 def on_load(server, prev):
     @new_thread('cb-original-output-probe')
     def probe(source, ctx):

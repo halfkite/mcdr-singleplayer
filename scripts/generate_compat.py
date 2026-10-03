@@ -100,6 +100,10 @@ def adapt_java(text, name, row, loader):
         if name == 'RestoreTitleOverlay.java':
             text = legacy_overlay(text, game)
     if name == 'SingleplayerBridge.java':
+        if parts < (26, 1):
+            # LocalPlayer lost sendSystemMessage in 1.21.2, so append the
+            # local notice directly to the older chat component.
+            text = text.replace('client.player.sendSystemMessage(', 'client.gui.getChat().addMessage(')
         text = text.replace('server.isPaused()', 'Minecraft.getInstance().isPaused()')
         if parts < (26, 1):
             if parts < (1, 21, 6):

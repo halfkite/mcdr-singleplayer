@@ -33,9 +33,8 @@ public final class SingleplayerBridge implements ModInitializer {
     private RestoreProgressMonitor restoreProgress;
     private boolean showingPythonPrompt;
     private boolean pythonPromptDismissed;
-    private boolean pythonWasMissingInWorld;
     private boolean showingMcdrInstallNotice;
-    private boolean mcdrInstallNoticeShown;
+    private InstallProgress.Feedback installFeedback = new InstallProgress.Feedback();
     private final ClientCommandTree clientCommands = new ClientCommandTree(() -> endpoint, this::forward);
     private final Map<ServerLevel, Boolean> previousAutoSave = new HashMap<>();
     private volatile boolean restoreAutoSaveNeeded;
@@ -133,7 +132,6 @@ public final class SingleplayerBridge implements ModInitializer {
             if (runtime != null) {
                 boolean inSingleplayer = client.getSingleplayerServer() != null && client.player != null && client.level != null;
                 if (runtime.pythonMissing() && inSingleplayer) {
-                    pythonWasMissingInWorld = true;
                     if (!showingPythonPrompt && !pythonPromptDismissed) {
                         showingPythonPrompt = true;
                         client.gui.setScreen(new PythonSetupScreen(() -> {
@@ -141,12 +139,21 @@ public final class SingleplayerBridge implements ModInitializer {
                             pythonPromptDismissed = true;
                         }));
                     }
-                } else if (runtime.pythonReady() && inSingleplayer && pythonWasMissingInWorld && !mcdrInstallNoticeShown) {
-                    showingPythonPrompt = false;
-                    mcdrInstallNoticeShown = true;
-                    showingMcdrInstallNotice = true;
-                    client.gui.setScreen(new McdrInstallNoticeScreen(runtime.autoInstallEnabled(),
-                            () -> showingMcdrInstallNotice = false));
+                } else if (runtime.pythonReady() && inSingleplayer) {
+                    InstallProgress value = currentInstallProgress();
+                    if (installFeedback.shouldAnnounce(value, System.currentTimeMillis())) {
+                        Component stage = Component.translatable(value.translationKey());
+                        if (value.attempt() > 0) stage = stage.copy().append(Component.translatable(
+                                "mcdr-singleplayer.install.attempt", value.attempt()));
+                        client.player.sendSystemMessage(Component.translatable("mcdr-singleplayer.install.chat", stage));
+                    }
+                    if (installFeedback.shouldOpen(value, client.gui.screen() == null
+                            || client.gui.screen() instanceof PythonSetupScreen)) {
+                        showingPythonPrompt = false;
+                        showingMcdrInstallNotice = true;
+                        client.gui.setScreen(new McdrInstallNoticeScreen(this::currentInstallProgress,
+                                () -> showingMcdrInstallNotice = false));
+                    }
                 } else if (!inSingleplayer) {
                     if ((showingPythonPrompt && client.gui.screen() instanceof PythonSetupScreen)
                             || (showingMcdrInstallNotice && client.gui.screen() instanceof McdrInstallNoticeScreen)) {
@@ -155,7 +162,7 @@ public final class SingleplayerBridge implements ModInitializer {
                     showingPythonPrompt = false;
                     showingMcdrInstallNotice = false;
                     pythonPromptDismissed = false;
-                    pythonWasMissingInWorld = false;
+                    installFeedback = new InstallProgress.Feedback();
                 }
             }
             BridgeEndpoint bridge = endpoint;
@@ -167,6 +174,11 @@ public final class SingleplayerBridge implements ModInitializer {
                 });
             }
         });
+    }
+
+    private InstallProgress currentInstallProgress() {
+        BridgeEndpoint bridge = endpoint;
+        return runtime.installProgress(bridge != null && bridge.connected());
     }
 
     private void monitorRestore(Path progressPath) {

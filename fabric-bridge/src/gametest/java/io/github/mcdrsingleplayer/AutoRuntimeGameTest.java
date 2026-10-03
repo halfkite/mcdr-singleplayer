@@ -55,7 +55,7 @@ public final class AutoRuntimeGameTest implements FabricClientGameTest {
                 from mcdreforged.api.command import Literal, QuotableText
                 import os, time
                 from pathlib import Path
-                PLUGIN_METADATA = {'id': 'test_command_probe', 'version': '1.0.0', 'dependencies': {'prime_backup': '==1.13.1', 'singleplayer_prime_backup': '==0.4.0'}}
+                PLUGIN_METADATA = {'id': 'test_command_probe', 'version': '1.0.0', 'dependencies': {'prime_backup': '==1.13.1', 'singleplayer_prime_backup': '==0.4.1'}}
                 _export = None
                 ExportBackupToDirectoryAction = None
                 def on_load(server, previous):

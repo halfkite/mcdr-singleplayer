@@ -40,6 +40,6 @@ def test_missing_adapter_release_is_rejected_before_config_is_changed(tmp_path):
     world = tmp_path / 'world'; world.mkdir()
     (world / 'level.dat').write_bytes(b'test')
     # No bundled artifacts and no release in this intentionally empty source root.
-    with pytest.raises(ValueError, match='complete 0.4.0 release'):
+    with pytest.raises(ValueError, match='complete 0.4.1 release'):
         configure(tmp_path / 'empty-source', mcdr, world)
     assert not (mcdr / 'date/prime_backup/config.json').exists()

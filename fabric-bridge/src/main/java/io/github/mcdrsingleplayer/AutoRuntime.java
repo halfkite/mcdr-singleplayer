@@ -23,6 +23,7 @@ final class AutoRuntime {
     private String language;
     private volatile boolean closing;
     private volatile PythonStatus pythonStatus = PythonStatus.CHECKING;
+    private volatile InstallProgress installProgress = new InstallProgress("preparing", 0);
     private final com.google.gson.JsonArray setupRequests = new com.google.gson.JsonArray();
 
     private enum PythonStatus { CHECKING, MISSING, READY }
@@ -54,6 +55,9 @@ final class AutoRuntime {
     boolean pythonMissing() { return pythonStatus == PythonStatus.MISSING; }
     boolean pythonReady() { return pythonStatus == PythonStatus.READY; }
     boolean autoInstallEnabled() { return config.autoInstall; }
+    InstallProgress installProgress(boolean connected) {
+        return connected ? new InstallProgress("ready", 0) : installProgress;
+    }
 
     synchronized void requestSetup(String action, String player) {
         JsonObject request = new JsonObject();
@@ -103,7 +107,7 @@ final class AutoRuntime {
             pythonStatus = PythonStatus.READY;
             try {
                 Files.createDirectories(common);
-                Path resources = common.resolve("runtime/bootstrap-resources-0.4.0");
+                Path resources = common.resolve("runtime/bootstrap-resources-0.4.1");
                 extract(resources);
                 List<String> command;
                 if (config.autoInstall) command = new ArrayList<>(List.of(python, resources.resolve("bridge_bootstrap.py").toString(),
@@ -112,10 +116,29 @@ final class AutoRuntime {
                 command.addAll(List.of("--config", gameConfig.toString(), "--state", stateFile.toString(),
                         "--client-id", clientId, "--parent-pid", Long.toString(ProcessHandle.current().pid())));
                 Files.createDirectories(common.resolve("log"));
-                new ProcessBuilder(command).redirectErrorStream(true)
+                Process process = new ProcessBuilder(command).redirectErrorStream(true)
                         .redirectOutput(ProcessBuilder.Redirect.appendTo(common.resolve("log/bootstrap.log").toFile())).start();
                 LOGGER.info("MCDR controller starting; shared directory: {}. Installation progress: bootstrap.log", common);
-            } catch (Exception e) { LOGGER.error("Automatic MCDR installation failed ({})", e.getMessage()); }
+                if (!config.autoInstall) installProgress = new InstallProgress("starting", 0);
+                Path progressFile = common.resolve("runtime/install-progress.json");
+                while (!closing) {
+                    if (config.autoInstall) {
+                        try {
+                            if (Files.isRegularFile(progressFile) && Files.size(progressFile) <= 4096) {
+                                InstallProgress value = InstallProgress.parse(Files.readString(progressFile), clientId);
+                                if (value != null) installProgress = value;
+                            }
+                        } catch (IOException ignored) { /* Retain the last stage during atomic replacement. */ }
+                    }
+                    if (process.waitFor(500, TimeUnit.MILLISECONDS)) {
+                        if (!closing) installProgress = new InstallProgress("failed", 0);
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                installProgress = new InstallProgress("failed", 0);
+                LOGGER.error("Automatic MCDR installation failed ({})", e.getMessage());
+            }
         });
     }
 

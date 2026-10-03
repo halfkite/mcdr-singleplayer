@@ -15,6 +15,9 @@ def test_setup_dialogs_use_the_target_screen_api(loader, row):
         if parts < (26, 2):
             assert '.gui.screen()' not in generated
             assert '.gui.setScreen(' not in generated
+            if name == 'SingleplayerBridge.java' and parts < (26, 1):
+                assert 'client.player.sendSystemMessage(' not in generated
+                assert 'client.gui.getChat().addMessage(' in generated
         if name != 'SingleplayerBridge.java' and parts < (26, 1):
             assert 'GuiGraphicsExtractor' not in generated
             assert 'extractRenderState' not in generated
@@ -27,12 +30,12 @@ def test_setup_dialogs_use_the_target_screen_api(loader, row):
 
 def test_family_build_rejects_old_version_and_ignores_stale_jars(tmp_path, monkeypatch):
     monkeypatch.setattr(build_matrix, 'ROOT', tmp_path)
-    monkeypatch.setattr(build_matrix, 'VERSION', '0.4.0')
+    monkeypatch.setattr(build_matrix, 'VERSION', '0.4.1')
     libs = tmp_path / 'build/matrix/fabric/26.3/build/libs'
     libs.mkdir(parents=True)
     (libs / 'mcdr-singleplayer-0.3.10+fabric+mc26.3.jar').write_bytes(b'old build')
     with pytest.raises(RuntimeError, match='current version'):
         build_matrix.variant_artifact('fabric', '26.3')
-    current = libs / 'mcdr-singleplayer-0.4.0+fabric+mc26.3.jar'
+    current = libs / 'mcdr-singleplayer-0.4.1+fabric+mc26.3.jar'
     current.write_bytes(b'current build')
     assert build_matrix.variant_artifact('fabric', '26.3') == current

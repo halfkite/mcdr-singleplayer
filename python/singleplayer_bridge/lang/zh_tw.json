@@ -185,5 +185,20 @@
   "mcdr-singleplayer.client.execution_failed": "命令執行失敗（%s）",
   "mcdr-singleplayer.command.loaded": "單人橋接已載入，MCDR 的 start/stop/kill 管理代理連線，不會關閉或重新啟動遊戲世界",
   "mcdr-singleplayer.restore.reenter_auto": "單人存檔回檔完成，請在 Minecraft 中重新進入原世界，MCDR 將自動連接對應存檔配置",
-  "mcdr-singleplayer.restore.reenter_manual": "單人存檔回檔完成，請在 Minecraft 中手動進入原世界，再執行 !!MCDR server start 連接"
+  "mcdr-singleplayer.restore.reenter_manual": "單人存檔回檔完成，請在 Minecraft 中手動進入原世界，再執行 !!MCDR server start 連接",
+  "mcdr-singleplayer.install.title": "MCDR 安裝與啟動進度",
+  "mcdr-singleplayer.install.intro": "MCDR 尚未安裝或啟動完成\n關閉視窗不會中止安裝\n準備完成後才能使用 MCDR 指令與備份外掛",
+  "mcdr-singleplayer.install.ready_intro": "MCDR 已完成安裝並連線至目前的單人存檔\n現在可以使用 MCDR 指令與已安裝的外掛",
+  "mcdr-singleplayer.install.failed_intro": "MCDR 安裝或啟動失敗\n請查看 mcdr-singleplayer/log 下的 install.log 和 bootstrap.log\n解決問題後重新啟動遊戲再試",
+  "mcdr-singleplayer.install.chat": "[mcdr-singleplayer] MCDR 進度：%s",
+  "mcdr-singleplayer.install.attempt": "（第 %s 個依賴下載來源）",
+  "mcdr-singleplayer.install.stage.preparing": "正在檢查與準備安裝環境",
+  "mcdr-singleplayer.install.stage.environment": "正在建立獨立 Python 環境",
+  "mcdr-singleplayer.install.stage.dependencies": "正在下載與安裝 MCDR 和外掛執行依賴",
+  "mcdr-singleplayer.install.stage.files": "正在準備 MCDR 橋接檔案",
+  "mcdr-singleplayer.install.stage.config": "正在準備 MCDR 設定",
+  "mcdr-singleplayer.install.stage.plugins": "正在準備橋接外掛與備份配接器",
+  "mcdr-singleplayer.install.stage.starting": "安裝檢查已完成，正在啟動並連線至目前存檔",
+  "mcdr-singleplayer.install.stage.ready": "MCDR 已就緒，可以使用指令與已安裝的外掛",
+  "mcdr-singleplayer.install.stage.failed": "安裝或啟動失敗，請查看 mcdr-singleplayer/log 下的日誌並重新啟動遊戲再試"
 }

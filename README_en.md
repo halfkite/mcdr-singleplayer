@@ -39,6 +39,8 @@ Place the JAR for your loader and Minecraft version series in the `mods/` folder
 
 After MCDR starts, chat explains that the main player has MCDR permission level 4 and offers optional backup plugins. Follow the prompts to install Prime Backup or Chunk Backup. After installing Prime Backup, you can choose whether to enable backups, schedule one every 4 hours, and apply the recommended automatic cleanup settings.
 
+If MCDR is still being prepared when you enter a world, a progress screen identifies the mod. Close it with the button or Esc while installation continues in the background. Chat reports installation stages, download source changes, readiness, or failure, with a reminder every 20 seconds during long waits.
+
 ## Features
 
 - Forward in-game chat, player join and leave events, and world start and stop events to MCDR plugins; relay commands and their responses

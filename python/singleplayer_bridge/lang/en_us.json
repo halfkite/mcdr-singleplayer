@@ -185,5 +185,20 @@
   "mcdr-singleplayer.client.execution_failed": "Command execution failed (%s)",
   "mcdr-singleplayer.command.loaded": "Singleplayer bridge loaded, MCDR start/stop/kill manage the proxy connection without closing or restarting the world",
   "mcdr-singleplayer.restore.reenter_auto": "Singleplayer restore complete, reopen the original world in Minecraft to connect its MCDR profile automatically",
-  "mcdr-singleplayer.restore.reenter_manual": "Singleplayer restore complete, reopen the original world in Minecraft and use !!MCDR server start to reconnect"
+  "mcdr-singleplayer.restore.reenter_manual": "Singleplayer restore complete, reopen the original world in Minecraft and use !!MCDR server start to reconnect",
+  "mcdr-singleplayer.install.title": "MCDR installation and startup",
+  "mcdr-singleplayer.install.intro": "MCDR installation or startup is still in progress\nClosing this screen will not stop installation\nMCDR commands and backup plugins become available when setup finishes",
+  "mcdr-singleplayer.install.ready_intro": "MCDR is installed and connected to this singleplayer world\nYou can now use MCDR commands and installed plugins",
+  "mcdr-singleplayer.install.failed_intro": "MCDR installation or startup failed\nCheck install.log and bootstrap.log in mcdr-singleplayer/log\nResolve the issue and restart the game to try again",
+  "mcdr-singleplayer.install.chat": "[mcdr-singleplayer] MCDR progress: %s",
+  "mcdr-singleplayer.install.attempt": " (dependency download source %s)",
+  "mcdr-singleplayer.install.stage.preparing": "Checking and preparing the installation environment",
+  "mcdr-singleplayer.install.stage.environment": "Creating an isolated Python environment",
+  "mcdr-singleplayer.install.stage.dependencies": "Downloading and installing MCDR and plugin dependencies",
+  "mcdr-singleplayer.install.stage.files": "Preparing MCDR bridge files",
+  "mcdr-singleplayer.install.stage.config": "Preparing MCDR configuration",
+  "mcdr-singleplayer.install.stage.plugins": "Preparing bridge plugins and backup adapters",
+  "mcdr-singleplayer.install.stage.starting": "Installation checks complete, starting and connecting to this world",
+  "mcdr-singleplayer.install.stage.ready": "MCDR is ready for commands and installed plugins",
+  "mcdr-singleplayer.install.stage.failed": "Installation or startup failed, check mcdr-singleplayer/log and restart the game to retry"
 }

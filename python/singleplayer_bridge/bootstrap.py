@@ -22,13 +22,26 @@ PIP_INDEXES = ['https://pypi.org/simple', 'https://pypi.tuna.tsinghua.edu.cn/sim
 DEFAULT_MIRRORS = ['https://gh-proxy.com/']
 
 
+class InstallationProgress:
+    """Atomic, client-scoped stages for the in-game installer UI; never publish pip output."""
+    def __init__(self, common, client_id):
+        self.path = Path(common) / 'runtime/install-progress.json'
+        self.client_id = client_id
+
+    def report(self, stage, attempt=0):
+        try:
+            write_json(self.path, dict(protocol=1, client_id=self.client_id, stage=stage, attempt=attempt))
+        except OSError:
+            logging.warning('Could not publish installation progress', exc_info=True)
+
+
 def download_checked(urls, destination, digest, opener=urllib.request.urlopen):
     destination = Path(destination)
     temporary = destination.with_name(destination.name + '.download')
     for url in urls:
         try:
             started = time.monotonic()
-            request = urllib.request.Request(url, headers={'User-Agent': 'MCDR-Singleplayer-Bridge/0.4.0'})
+            request = urllib.request.Request(url, headers={'User-Agent': 'MCDR-Singleplayer-Bridge/0.4.1'})
             with opener(request, timeout=15) as response, temporary.open('wb') as output:
                 total = 0
                 while chunk := response.read(65536):
@@ -47,8 +60,10 @@ def download_checked(urls, destination, digest, opener=urllib.request.urlopen):
     raise RuntimeError(tr('error.all_download_sources_failed_see_log_install_log'))
 
 
-def install_dependencies(python, requirements, indexes=None, runner=subprocess.run):
-    for index in indexes or PIP_INDEXES:
+def install_dependencies(python, requirements, indexes=None, runner=subprocess.run, progress=None):
+    for attempt, index in enumerate(indexes or PIP_INDEXES, 1):
+        if progress:
+            progress('dependencies', attempt)
         logging.info('Installing/updating tested runtime packages using %s', index)
         try:
             result = runner([str(python), '-m', 'pip', 'install', '--upgrade', '--disable-pip-version-check',
@@ -88,7 +103,8 @@ def configure_common(common, python, runtime):
             yaml.dump(config, output)
 
 
-def install(common, resources, update=False):
+def install(common, resources, update=False, progress=None):
+    progress = progress or (lambda stage, attempt=0: None)
     common, resources = Path(common).resolve(), Path(resources).resolve()
     common.mkdir(parents=True, exist_ok=True)
     from .layout import migrate_legacy
@@ -97,6 +113,7 @@ def install(common, resources, update=False):
     config_dir = common
     environment = runtime_root / '.bridge-venv'
     python = environment / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+    progress('environment')
     if not python.exists():
         venv.EnvBuilder(with_pip=True).create(environment)
     marker = runtime_root / 'runtime-install.json'
@@ -108,11 +125,13 @@ def install(common, resources, update=False):
         "from importlib.metadata import version; assert version('mcdreforged') == '2.16.0'"],
         capture_output=True, timeout=30, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     if update or probe.returncode != 0 or previous.get('requirements_sha256') != signature or time.time() - previous.get('checked_at', 0) > 86400:
-        install_dependencies(python, requirements)
+        install_dependencies(python, requirements, progress=progress)
+    progress('files')
     runtime = runtime_root / 'bridge-runtime'
     shutil.copytree(resources / 'runtime', runtime, dirs_exist_ok=True, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
     plugins = config_dir / 'plugins'
     plugins.mkdir(exist_ok=True)
+    progress('config')
     # MCDR init refuses existing directories; generate defaults separately then copy missing shared files.
     if not (config_dir / 'config.yml').exists() or not (config_dir / 'permission.yml').exists():
         import tempfile
@@ -124,6 +143,7 @@ def install(common, resources, update=False):
                     shutil.copy2(Path(directory) / name, config_dir / name)
     configure = [str(python), str(resources / 'bridge_bootstrap.py'), '--configure-only', '--common', str(common), '--resources', str(resources)]
     subprocess.run(configure, check=True, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    progress('plugins')
     # Backup plugins are opt-in. Keep bundled adapters outside the live plugin directory
     # until their upstream plugin is present; first-run chat provides install buttons.
     from .onboarding import archives
@@ -174,16 +194,19 @@ def main():
     if args.configure_only:
         configure_common(args.common.resolve(), Path(sys.executable), args.common.resolve() / 'runtime/bridge-runtime')
         return 0
+    progress = InstallationProgress(args.common, args.client_id)
+    progress.report('preparing')
     try:
         from .supervisor import lock_common
         installation_lock = lock_common(args.common, '.installation.lock')
         try:
             active_controller_lock = lock_common(args.common)
             active_controller_lock.close()
-            python = install(args.common, args.resources, args.update)
+            python = install(args.common, args.resources, args.update, progress=progress.report)
         finally:
             installation_lock.close()
         if args.state:
+            progress.report('starting')
             process = subprocess.Popen([str(python), str(args.common / 'runtime/bridge-runtime/bridge_supervisor.py'),
                 '--common', str(args.common), '--config', str(args.config), '--state', str(args.state),
                 '--client-id', args.client_id, '--parent-pid', args.parent_pid],
@@ -191,6 +214,7 @@ def main():
             return process.wait()
         return 0
     except Exception:
+        progress.report('failed')
         logging.exception('Automatic installation failed')
         return 1
 

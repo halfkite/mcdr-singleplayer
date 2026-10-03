@@ -79,7 +79,7 @@ public final class PrimeBackupGameTest implements FabricClientGameTest {
                 context.waitFor(client -> !client.isPaused());
                 // Reload cascades to the dependent adapter through MCDR's dependency manager.
                 console(process, "!!MCDR plugin reload prime_backup");
-                context.waitFor(client -> contains(log, "Plugin singleplayer_prime_backup@0.4.0 reloaded"), 1200);
+                context.waitFor(client -> contains(log, "Plugin singleplayer_prime_backup@0.4.1 reloaded"), 1200);
                 // A detached running world must never become an offline restore target.
                 console(process, "!!MCDR server stop");
                 context.waitFor(client -> contains(log, "Server process stopped with code 0"), 800);
