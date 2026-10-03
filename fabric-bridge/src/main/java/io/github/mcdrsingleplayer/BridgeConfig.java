@@ -23,7 +23,7 @@ final class BridgeConfig {
     static Path rootForGame(Path game) { return game.resolve("mcdr-singleplayer"); }
     static Path runtimeForGame(Path game) { return rootForGame(game).resolve("runtime"); }
     static Path configRootForGame(Path game) { return rootForGame(game); }
-    static Path pathForGame(Path game) { return configRootForGame(game).resolve("config.json"); }
+    static Path pathForGame(Path game) { return configRootForGame(game).resolve("mcdr-singleplayer-config.yml"); }
 
     static BridgeConfig loadForGame(Path game) throws IOException {
         Path path = pathForGame(game);
@@ -33,7 +33,8 @@ final class BridgeConfig {
             if (Files.isSymbolicLink(child)) throw new IOException("mcdr-singleplayer folders cannot be links");
             Files.createDirectories(child);
         }
-        if (Files.isSymbolicLink(path.getParent()) || Files.isSymbolicLink(path))
+        if (Files.isSymbolicLink(path.getParent()) || Files.isSymbolicLink(path)
+                || Files.isSymbolicLink(root.resolve("config.json")))
             throw new IOException("The mcdr-singleplayer configuration cannot be a link");
         for (Path previousStatus : new Path[]{game.resolve("config/.mcdr_restore_progress.json"), runtimeForGame(game).resolve(".mcdr_restore_progress.json")}) {
           if (Files.isRegularFile(previousStatus)) {
@@ -47,6 +48,14 @@ final class BridgeConfig {
         Files.createDirectories(configRootForGame(game));
         Files.createDirectories(path.getParent());
         Path legacy = game.resolve("config/mcdr_singleplayer_bridge.json");
+        Path oldRootConfig = root.resolve("config.json");
+        if (!Files.exists(path)) {
+            Path source = Files.isRegularFile(oldRootConfig) ? oldRootConfig : legacy;
+            if (Files.isRegularFile(source)) {
+                BridgeConfig old = load(source);
+                writeConfig(path, old);
+            }
+        }
         if (Files.isRegularFile(legacy)) {
             if (Files.size(legacy) > 8192) throw new IOException("Legacy config exceeds limit");
             var old = com.google.gson.JsonParser.parseString(Files.readString(legacy)).getAsJsonObject();
@@ -61,12 +70,10 @@ final class BridgeConfig {
                 record.addProperty("source", source.toAbsolutePath().normalize().toString());
                 Files.writeString(migration, record.toString());
             }
-            if (!Files.exists(path)) Files.move(legacy, path);
-            else {
-                Path history = runtimeForGame(game).resolve("migration-history");
-                Files.createDirectories(history);
-                Files.move(legacy, history.resolve("bridge-config-" + java.util.UUID.randomUUID() + ".json"));
-            }
+            preserveLegacy(legacy, runtimeForGame(game), "bridge-config-", ".json");
+        }
+        if (Files.isRegularFile(oldRootConfig)) {
+            preserveLegacy(oldRootConfig, runtimeForGame(game), "config-json-", ".json");
         }
         for (String name : new String[]{".mcdr_restore_progress.json", ".mcdr_restore_locks.json", ".mcdr_bridge_session.json"}) {
             Path previous = game.resolve("config").resolve(name);
@@ -91,8 +98,15 @@ final class BridgeConfig {
         }
         BridgeConfig config = load(path);
         // Remove retired external-directory settings from the canonical config.
-        Files.writeString(path, new GsonBuilder().setPrettyPrinting().create().toJson(config) + "\n");
+        writeConfig(path, config);
         return config;
+    }
+
+    private static void preserveLegacy(Path source, Path runtime, String prefix, String suffix) throws IOException {
+        Path history = runtime.resolve("migration-history");
+        if (Files.isSymbolicLink(history)) throw new IOException("Migration history cannot be a link");
+        Files.createDirectories(history);
+        Files.move(source, history.resolve(prefix + java.util.UUID.randomUUID() + suffix));
     }
 
     private static void migrateGroupedDirectories(Path root) throws IOException {
@@ -154,19 +168,96 @@ final class BridgeConfig {
         BridgeConfig config;
         if (Files.exists(path)) {
             if (Files.size(path) > 8192) throw new IOException("Bridge config exceeds limit");
-            config = gson.fromJson(Files.readString(path, StandardCharsets.UTF_8), BridgeConfig.class);
+            String text = Files.readString(path, StandardCharsets.UTF_8);
+            config = text.stripLeading().startsWith("{") || path.getFileName().toString().toLowerCase().endsWith(".json")
+                    ? gson.fromJson(text, BridgeConfig.class) : fromYaml(text, gson);
         } else {
             config = new BridgeConfig();
             byte[] random = new byte[32];
             new SecureRandom().nextBytes(random);
             config.token = HexFormat.of().formatHex(random);
             Files.createDirectories(path.getParent());
-            Files.writeString(path, gson.toJson(config) + "\n", StandardCharsets.UTF_8);
+            writeConfig(path, config);
         }
         if (config == null || config.port < 1 || config.port > 65535
                 || config.token == null || config.token.length() < 32 || config.token.length() > 256) {
             throw new IOException("Invalid bridge configuration");
         }
         return config;
+    }
+
+    private static BridgeConfig fromYaml(String text, Gson gson) throws IOException {
+        var values = new com.google.gson.JsonObject();
+        int lineNumber = 0;
+        for (String line : text.split("\\R")) {
+            lineNumber++;
+            String stripped = line.strip();
+            if (stripped.isEmpty() || stripped.startsWith("#")) continue;
+            int separator = stripped.indexOf(':');
+            if (separator <= 0) throw new IOException("Invalid bridge YAML at line " + lineNumber);
+            String key = stripped.substring(0, separator).strip();
+            String raw = stripYamlComment(stripped.substring(separator + 1).strip());
+            try {
+                com.google.gson.JsonElement value;
+                if (raw.startsWith("\"") || raw.startsWith("[") || raw.startsWith("{"))
+                    value = com.google.gson.JsonParser.parseString(raw);
+                else if (raw.equals("true") || raw.equals("false") || raw.matches("-?[0-9]+"))
+                    value = com.google.gson.JsonParser.parseString(raw);
+                else value = new com.google.gson.JsonPrimitive(raw.split(" #", 2)[0].strip());
+                values.add(key, value);
+            } catch (RuntimeException exception) {
+                throw new IOException("Invalid bridge YAML at line " + lineNumber, exception);
+            }
+        }
+        return gson.fromJson(values, BridgeConfig.class);
+    }
+
+    private static String stripYamlComment(String value) {
+        char quote = 0;
+        boolean escaped = false;
+        for (int index = 0; index < value.length(); index++) {
+            char current = value.charAt(index);
+            if (escaped) escaped = false;
+            else if (current == '\\' && quote == '"') escaped = true;
+            else if (quote != 0 && current == quote) quote = 0;
+            else if (quote == 0 && (current == '"' || current == '\'')) quote = current;
+            else if (quote == 0 && current == '#' && (index == 0 || Character.isWhitespace(value.charAt(index - 1))))
+                return value.substring(0, index).stripTrailing();
+        }
+        return value;
+    }
+
+    private static void writeConfig(Path path, BridgeConfig config) throws IOException {
+        if (path.getFileName().toString().toLowerCase().endsWith(".json")) {
+            Files.writeString(path, new GsonBuilder().setPrettyPrinting().create().toJson(config) + "\n", StandardCharsets.UTF_8);
+            return;
+        }
+        Gson gson = new Gson();
+        String contents = """
+                # MCDR Singleplayer bridge settings / 单人游戏 MCDR 桥接设置
+                # These settings apply to this game instance; plugin data remains separated by save.
+                # 本设置作用于当前游戏实例；各存档的插件配置和数据仍分别保存在 date/<存档文件夹名>。
+                # Edit values below, then restart the game to apply changes.
+                # 修改下列数值后重启游戏生效。
+                # 启用单人游戏与 MCDR 的桥接
+                enabled: %s
+                # 本机回环连接端口；发生冲突时可修改
+                port: %s
+                # 随机身份验证令牌，请勿分享或公开
+                token: %s
+                # 进入单人存档时自动启动 MCDR
+                autoStartMcdr: %s
+                # 可选的 Python 可执行文件路径；留空时自动检测
+                pythonExecutable: %s
+                # 自动准备 MCDR、桥接插件及运行依赖
+                autoInstall: %s
+                # 是否隐藏首次使用提示
+                onboardingDismissed: %s
+                # 上次显示提示的客户端标识，由模组维护
+                onboardingLastClientId: %s
+                """.formatted(config.enabled, config.port, gson.toJson(config.token), config.autoStartMcdr,
+                        gson.toJson(config.pythonExecutable), config.autoInstall, config.onboardingDismissed,
+                        gson.toJson(config.onboardingLastClientId));
+        Files.writeString(path, contents, StandardCharsets.UTF_8);
     }
 }

@@ -1,5 +1,6 @@
 """MCDR-managed stdin/stdout proxy. No Minecraft or MCDR dependency required."""
 from singleplayer_bridge.i18n import tr
+from singleplayer_bridge.config_file import read as read_bridge_config
 import argparse
 import os
 import json
@@ -52,7 +53,7 @@ class BridgeProxy:
     def read_config(self):
         if self.config_path.stat().st_size > 8192:
             raise ProtocolError('configuration exceeds limit')
-        config = json.loads(self.config_path.read_text(encoding='utf-8-sig'))
+        config = read_bridge_config(self.config_path)
         if not isinstance(config, dict):
             raise ProtocolError('invalid bridge configuration')
         port = config.get('port', 25585)
@@ -246,7 +247,7 @@ class BridgeProxy:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--config', type=Path, help='Game mcdr-singleplayer/config.json')
+    parser.add_argument('--config', type=Path, help='Game mcdr-singleplayer/mcdr-singleplayer-config.yml')
     parser.add_argument('--config-env', action='store_true')
     args = parser.parse_args()
     if args.config_env:

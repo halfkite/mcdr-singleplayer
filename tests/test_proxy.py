@@ -7,6 +7,7 @@ import time
 import pytest
 
 from singleplayer_bridge.proxy import BridgeProxy
+from singleplayer_bridge.config_file import write as write_bridge_config
 from singleplayer_bridge.protocol import ProtocolError, encode_frame, read_frame
 
 
@@ -65,8 +66,8 @@ def test_profile_lease_rejects_other_world_before_startup(tmp_path, monkeypatch,
     listener.bind(('127.0.0.1', 0))
     listener.listen()
     listener.settimeout(5)
-    config = tmp_path / 'bridge.json'
-    config.write_text(json.dumps(dict(enabled=True, port=listener.getsockname()[1], token='a' * 64)))
+    config = tmp_path / 'mcdr-singleplayer-config.yml'
+    write_bridge_config(config, dict(enabled=True, port=listener.getsockname()[1], token='a' * 64))
     reader, writer = socket.socketpair()
     output = Output()
     proxy = BridgeProxy(config, stdin=reader.makefile('r'), stdout=output, stderr=io.StringIO())
@@ -95,8 +96,8 @@ def test_real_socket_handshake_command_and_world_close(tmp_path):
     listener.bind(('127.0.0.1', 0))
     listener.listen()
     listener.settimeout(5)
-    config = tmp_path / 'bridge.json'
-    config.write_text(json.dumps(dict(enabled=True, port=listener.getsockname()[1], token=token)))
+    config = tmp_path / 'mcdr-singleplayer-config.yml'
+    write_bridge_config(config, dict(enabled=True, port=listener.getsockname()[1], token=token))
     stdin_reader, stdin_writer = socket.socketpair()
     output = Output()
     proxy = BridgeProxy(config, stdin=stdin_reader.makefile('r', encoding='utf8'), stdout=output, stderr=io.StringIO())

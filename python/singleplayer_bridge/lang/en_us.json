@@ -1,5 +1,12 @@
 {
   "mcdr-singleplayer.onboarding.intro": "Mod data is stored in mcdr-singleplayer under the game directory\nThe singleplayer host receives MCDR owner permission (level 4)\nPlugin settings and data are stored separately by save folder name\nAfter permanently deleting a save, remove its matching folder under .\\mcdr-singleplayer\\date",
+  "mcdr-singleplayer.python.required_title": "Python is required",
+  "mcdr-singleplayer.python.required_intro": "This singleplayer world needs Python 3.10 or newer with pip\nMCDR will start automatically after the installation is detected",
+  "mcdr-singleplayer.python.latest_stable": "Latest stable release: Python %s",
+  "mcdr-singleplayer.python.install_instructions": "In Customize installation, keep the “pip” option checked on Optional Features\nAlso check “Add python.exe to PATH” on the first page when available",
+  "mcdr-singleplayer.python.windows_direct": "Windows 64-bit [Direct download]",
+  "mcdr-singleplayer.python.windows_mirror": "Windows 64-bit [Mirror]",
+  "mcdr-singleplayer.python.other_systems": "Python downloads for other systems",
   "mcdr-singleplayer.onboarding.warning": "WARNING!!! This mod is in early testing, before using MCDR backup plugins in singleplayer, make sure you have another complete backup!!!",
   "mcdr-singleplayer.onboarding.recommend": "Recommended: ",
   "mcdr-singleplayer.onboarding.prime": "Incremental backup: Prime Backup",

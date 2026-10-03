@@ -47,19 +47,7 @@ def main():
     shutil.copy2(ROOT / 'docs' / '安装说明.md', bundle / '安装说明.md')
     shutil.copy2(ROOT / 'docs' / 'PrimeBackup适配.md', bundle / 'PrimeBackup适配.md')
     shutil.copy2(ROOT / 'docs' / 'ChunkBackup适配.md', bundle / 'ChunkBackup适配.md')
-    shutil.copy2(ROOT / 'docs' / 'PrimeBackup测试记录.md', bundle / 'PrimeBackup测试记录.md')
     shutil.copy2(ROOT / 'docs' / '自动启动与存档配置.md', bundle / '自动启动与存档配置.md')
-    shutil.copy2(ROOT / 'docs' / '自动启动测试记录.md', bundle / '自动启动测试记录.md')
-    for record in sorted((ROOT / 'docs').glob('0.*.md')):
-        shutil.copy2(record, bundle / record.name)
-    (bundle / 'assets').mkdir()
-    for name in ('prime-backup-baseline.png', 'prime-backup-online.png', 'prime-backup-restored.png',
-                 'prime-backup-baseline.log', 'prime-backup-adapted.log'):
-        shutil.copy2(ROOT / 'docs/assets' / name, bundle / 'assets' / name)
-    for file in (ROOT / 'docs/assets').glob('automatic-*'):
-        shutil.copy2(file, bundle / 'assets' / file.name)
-    for file in (ROOT / 'docs/assets').glob('chunk-backup-*'):
-        shutil.copy2(file, bundle / 'assets' / file.name)
     shutil.copy2(ROOT / 'LICENSE', bundle / 'LICENSE')
     archive = shutil.make_archive(str(dist / f'mcdr-singleplayer-{version}-mc26.3-fabric'), 'zip', bundle)
     print(archive)

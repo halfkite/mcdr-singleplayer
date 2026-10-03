@@ -2,13 +2,7 @@ package io.github.mcdrsingleplayer;
 
 import com.google.gson.JsonObject;
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.file.*;
-import java.security.MessageDigest;
-import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipInputStream;
@@ -27,8 +21,11 @@ final class AutoRuntime {
     private String session;
     private String hostPlayer;
     private String language;
-    private boolean closing;
+    private volatile boolean closing;
+    private volatile PythonStatus pythonStatus = PythonStatus.CHECKING;
     private final com.google.gson.JsonArray setupRequests = new com.google.gson.JsonArray();
+
+    private enum PythonStatus { CHECKING, MISSING, READY }
 
     AutoRuntime(BridgeConfig config, Path gameConfig, Path gameDirectory) {
         this.config = config;
@@ -53,6 +50,8 @@ final class AutoRuntime {
         closing = true;
         writeState(); // Keep the live world until SERVER_STOPPED confirms saving finished.
     }
+
+    boolean pythonMissing() { return pythonStatus == PythonStatus.MISSING; }
 
     synchronized void requestSetup(String action, String player) {
         JsonObject request = new JsonObject();
@@ -85,12 +84,25 @@ final class AutoRuntime {
 
     void start() {
         publish(null, null);
-        Thread.ofVirtual().name("mcdr-auto-install").start(() -> {
+        Thread.ofVirtual().name("mcdr-python-detect").start(() -> {
+            String python = null;
+            while (!closing && python == null) {
+                python = findPython();
+                if (python == null) {
+                    if (pythonStatus != PythonStatus.MISSING) {
+                        LOGGER.info("Python 3.10 or newer with pip was not found; waiting for installation in a singleplayer world");
+                    }
+                    pythonStatus = PythonStatus.MISSING;
+                    try { Thread.sleep(3000); }
+                    catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
+                }
+            }
+            if (closing || python == null) return;
+            pythonStatus = PythonStatus.READY;
             try {
                 Files.createDirectories(common);
                 Path resources = common.resolve("runtime/bootstrap-resources-0.3.10");
                 extract(resources);
-                String python = python();
                 List<String> command;
                 if (config.autoInstall) command = new ArrayList<>(List.of(python, resources.resolve("bridge_bootstrap.py").toString(),
                         "--resources", resources.toString(), "--common", common.toString()));
@@ -121,46 +133,56 @@ final class AutoRuntime {
         }
     }
 
-    private String python() throws Exception {
+    private String findPython() {
         List<List<String>> candidates = new ArrayList<>();
         if (!config.pythonExecutable.isBlank()) candidates.add(List.of(config.pythonExecutable));
         Path owned = common.resolve("runtime/python-runtime/python.exe");
-        if (Files.exists(owned)) candidates.add(List.of(owned.toString()));
+        if (Files.isRegularFile(owned)) candidates.add(List.of(owned.toString()));
+        addWindowsInstallations(candidates);
         candidates.add(List.of("py", "-3"));
         candidates.add(List.of("python3"));
         candidates.add(List.of("python"));
         for (var candidate : candidates) {
             List<String> command = new ArrayList<>(candidate);
-            command.addAll(List.of("-c", "import sys; assert sys.version_info >= (3, 10); print(sys.executable)"));
+            command.addAll(List.of("-c", "import sys, pip; assert sys.version_info >= (3, 10); print(sys.executable)"));
             try {
                 Process check = new ProcessBuilder(command).redirectErrorStream(true).start();
-                if (!check.waitFor(10, TimeUnit.SECONDS)) { check.destroyForcibly(); continue; }
-                if (check.exitValue() == 0) return new String(check.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).strip();
+                if (!check.waitFor(4, TimeUnit.SECONDS)) { check.destroyForcibly(); continue; }
+                if (check.exitValue() == 0) {
+                    String output = new String(check.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).strip();
+                    if (!output.isBlank()) return output.lines().reduce((first, last) -> last).orElse(output);
+                }
             } catch (IOException ignored) { }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); return null; }
         }
-        if (!config.autoInstall || !System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows")
-                || !System.getProperty("os.arch").equals("amd64")) throw new IOException("Python >= 3.10 required; configure pythonExecutable");
-        Path installer = common.resolve("runtime/python-3.14.5-amd64.exe");
-        String hash = "f9c09f5ed6f796fd1a8bc5ddfa41715a494b453c4781f0e35d5077cf9fa58f6d";
-        HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).followRedirects(HttpClient.Redirect.NORMAL).build();
-        boolean downloaded = false;
-        for (String base : List.of("https://www.python.org/ftp/python/", "https://repo.huaweicloud.com/python/")) {
-            try {
-                var request = HttpRequest.newBuilder(URI.create(base + "3.14.5/python-3.14.5-amd64.exe")).timeout(Duration.ofSeconds(90)).GET().build();
-                var response = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
-                if (response.statusCode() != 200 || !HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(response.body())).equals(hash))
-                    throw new IOException("Python installer download/hash failed");
-                Files.write(installer, response.body());
-                downloaded = true;
-                break;
-            } catch (Exception e) { LOGGER.warn("Python download failed; trying next source ({})", e.getClass().getSimpleName()); }
+        return null;
+    }
+
+    private static void addWindowsInstallations(List<List<String>> candidates) {
+        if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("windows")) return;
+        String local = System.getenv("LOCALAPPDATA");
+        if (local != null) {
+            Path launcher = Path.of(local, "Programs", "Python", "Launcher", "py.exe");
+            if (Files.isRegularFile(launcher)) candidates.add(List.of(launcher.toString(), "-3"));
+            addInstalledPythonDirectories(candidates, Path.of(local, "Programs", "Python"));
         }
-        if (!downloaded) throw new IOException("All Python download sources failed");
-        Process setup = new ProcessBuilder(installer.toString(), "/quiet", "InstallAllUsers=0", "TargetDir=" + owned.getParent(),
-                "Include_launcher=0", "InstallLauncherAllUsers=0", "PrependPath=0", "Include_test=0")
-                .redirectErrorStream(true).redirectOutput(common.resolve("log/python-install.log").toFile()).start();
-        if (!setup.waitFor(5, TimeUnit.MINUTES) || setup.exitValue() != 0 || !Files.exists(owned))
-            throw new IOException("Python installation failed; see log/python-install.log");
-        return owned.toString();
+        addInstalledPythonDirectories(candidates, Path.of(System.getenv().getOrDefault("ProgramFiles", "C:\\Program Files")));
+        String programFilesX86 = System.getenv("ProgramFiles(x86)");
+        if (programFilesX86 != null) addInstalledPythonDirectories(candidates, Path.of(programFilesX86));
+        String windows = System.getenv("WINDIR");
+        if (windows != null) {
+            Path launcher = Path.of(windows, "py.exe");
+            if (Files.isRegularFile(launcher)) candidates.add(List.of(launcher.toString(), "-3"));
+        }
+    }
+
+    private static void addInstalledPythonDirectories(List<List<String>> candidates, Path directory) {
+        if (!Files.isDirectory(directory)) return;
+        try (var entries = Files.list(directory)) {
+            entries.filter(Files::isDirectory).filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).startsWith("python"))
+                    .sorted(Comparator.comparing(path -> path.getFileName().toString(), Comparator.reverseOrder()))
+                    .map(path -> path.resolve("python.exe")).filter(Files::isRegularFile)
+                    .forEach(path -> candidates.add(List.of(path.toString())));
+        } catch (IOException ignored) { }
     }
 }

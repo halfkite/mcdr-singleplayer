@@ -63,7 +63,10 @@ def main():
     result = {'result': 'passed', 'source': str(reference), 'profile': str(profile), 'backup_id': 1,
         'comment': backup.comment, 'exported_entries': files, 'source_database_sha256': before,
         'verified_blob_export': True, 'source_preserved': True}
-    (ROOT / 'docs/assets/automatic-0.3.10-migration.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf8')
+    artifact_dir = ROOT / 'build/test-artifacts'
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    (artifact_dir / 'automatic-0.3.10-migration.json').write_text(
+        json.dumps(result, ensure_ascii=False, indent=2), encoding='utf8')
     print(json.dumps(result, ensure_ascii=True, indent=2))
 
 

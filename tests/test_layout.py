@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from singleplayer_bridge.layout import migrate_legacy, organize_layout, migrate_profile_data
+from singleplayer_bridge.config_file import read as read_bridge_config
 from singleplayer_bridge.profiles import ensure_profile, profile_path, read_json, write_json
 from singleplayer_bridge.supervisor import lock_common
 
@@ -36,7 +37,7 @@ def fixture(tmp):
 def test_034_layout_is_grouped_and_default_config_backups_are_removed(tmp_path):
     common = tmp_path / 'game/mcdr-singleplayer'
     (common / 'config').mkdir(parents=True)
-    (common / 'config/config.json').write_text('{"enabled":true}')
+    (common / 'config/config.json').write_text('{"enabled":true,"token":"' + 'a' * 64 + '"}')
     (common / 'config.yml').write_text('language: en_us\n')
     (common / 'config.yml.before-20261002-162642-239250').write_text('default copy')
     (common / 'plugins').mkdir()
@@ -50,7 +51,12 @@ def test_034_layout_is_grouped_and_default_config_backups_are_removed(tmp_path):
     organize_layout(common)
 
     assert {'date', 'log', 'runtime', 'config.yml', 'plugins'} <= {path.name for path in common.iterdir()}
-    assert (common / 'config.json').read_text() == '{"enabled":true}'
+    migrated_config = common / 'mcdr-singleplayer-config.yml'
+    assert read_bridge_config(migrated_config)['enabled'] is True
+    assert read_bridge_config(migrated_config)['token'] == 'a' * 64
+    assert '# 启用单人游戏与 MCDR 的桥接' in migrated_config.read_text(encoding='utf8')
+    assert not (common / 'config.json').exists()
+    assert list((common / 'runtime/migration-history').glob('config-json-before-yaml-*.json'))
     assert (common / 'config.yml').is_file()
     assert (common / 'plugins/probe.py').read_text() == 'plugin'
     assert (common / 'runtime/bootstrap-resources-0.3.4/bridge_bootstrap.py').is_file()
@@ -142,7 +148,7 @@ def test_036_shared_files_and_backup_store_move_without_changing_database(tmp_pa
     digest = hashlib.sha256((store / 'prime_backup.db').read_bytes()).hexdigest()
     migrate_legacy(common)
     assert not config.exists() and not (profile / 'data').exists()
-    assert read_json(common / 'config.json')['token'] == 'a' * 64
+    assert read_bridge_config(common / 'mcdr-singleplayer-config.yml')['token'] == 'a' * 64
     assert (common / 'permission.yml').read_text() == 'owner permissions'
     assert (common / 'plugins/plugin.mcdr').read_bytes() == b'plugin'
     assert hashlib.sha256((profile / 'pb_files/prime_backup.db').read_bytes()).hexdigest() == digest

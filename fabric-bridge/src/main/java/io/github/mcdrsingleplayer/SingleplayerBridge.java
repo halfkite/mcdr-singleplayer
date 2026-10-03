@@ -31,6 +31,7 @@ public final class SingleplayerBridge implements ModInitializer {
     private AutoRuntime runtime;
     private Path configPath;
     private RestoreProgressMonitor restoreProgress;
+    private boolean showingPythonPrompt;
     private final ClientCommandTree clientCommands = new ClientCommandTree(() -> endpoint, this::forward);
     private final Map<ServerLevel, Boolean> previousAutoSave = new HashMap<>();
     private volatile boolean restoreAutoSaveNeeded;
@@ -125,6 +126,18 @@ public final class SingleplayerBridge implements ModInitializer {
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             clientCommands.tick();
+            if (runtime != null) {
+                boolean inSingleplayer = client.getSingleplayerServer() != null && client.player != null && client.level != null;
+                if (runtime.pythonMissing() && inSingleplayer) {
+                    if (!showingPythonPrompt) {
+                        client.gui.setScreen(new PythonSetupScreen());
+                        showingPythonPrompt = true;
+                    }
+                } else if (showingPythonPrompt) {
+                    client.gui.setScreen(null);
+                    showingPythonPrompt = false;
+                }
+            }
             BridgeEndpoint bridge = endpoint;
             if (bridge != null) {
                 bridge.pause(client.isPaused());

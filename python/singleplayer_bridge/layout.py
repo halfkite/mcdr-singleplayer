@@ -68,6 +68,25 @@ def organize_layout(common):
     if old_data.exists():
         _relocate(old_data, common / 'date', common)
 
+    # Older releases kept the mod settings beside MCDR's shared files as JSON.
+    # Convert that file to the named YAML settings file while retaining a copy
+    # in migration-history; MCDR's own configuration remains config.yml.
+    old_bridge_config = common / 'config.json'
+    bridge_config = common / 'mcdr-singleplayer-config.yml'
+    if linked(bridge_config):
+        raise ValueError(tr('error.migration_source_link', bridge_config.name))
+    if old_bridge_config.exists():
+        if linked(old_bridge_config):
+            raise ValueError(tr('error.migration_source_link', old_bridge_config.name))
+        history = common / 'runtime/migration-history'
+        if linked(history):
+            raise ValueError(tr('error.migration_source_link', history.name))
+        history.mkdir(parents=True, exist_ok=True)
+        if not bridge_config.exists():
+            from .config_file import read as read_bridge_config, write as write_bridge_config
+            write_bridge_config(bridge_config, read_bridge_config(old_bridge_config))
+        old_bridge_config.replace(history / f'config-json-before-yaml-{time.time_ns()}.json')
+
     folder_targets = {
         'logs': 'log/mcdr',
         '.bridge-venv': 'runtime/.bridge-venv',
@@ -97,7 +116,7 @@ def organize_layout(common):
             _relocate(source, common / 'log' / name, common)
 
     for source in list(common.iterdir()):
-        if source.name in {'date', 'log', 'runtime', 'plugins', 'config.json', 'config.yml', 'permission.yml', 'download-sources.json'}:
+        if source.name in {'date', 'log', 'runtime', 'plugins', 'config.json', 'mcdr-singleplayer-config.yml', 'config.yml', 'permission.yml', 'download-sources.json'}:
             continue
         if source.is_dir() and (source / 'profile.json').is_file():
             world_name = source.name

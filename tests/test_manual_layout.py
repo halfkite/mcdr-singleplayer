@@ -5,6 +5,7 @@ import subprocess
 import sys
 import zipfile
 from pathlib import Path
+from singleplayer_bridge.config_file import read as read_bridge_config
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -24,7 +25,8 @@ def test_manual_setup_keeps_all_settings_in_game_root_and_upgrades_bridge(tmp_pa
     result = subprocess.run(command, capture_output=True, text=True, encoding='utf8', env=environment)
     assert result.returncode == 0, result.stderr
     common = game / 'mcdr-singleplayer'
-    config = json.loads((common / 'config.json').read_text(encoding='utf8'))
+    config = read_bridge_config(common / 'mcdr-singleplayer-config.yml')
+    assert '# 随机身份验证令牌' in (common / 'mcdr-singleplayer-config.yml').read_text(encoding='utf8')
     assert config['autoStartMcdr'] is False
     assert len(config['token']) == 64
     assert not (game / 'config').exists()
@@ -42,7 +44,7 @@ def test_manual_setup_keeps_all_settings_in_game_root_and_upgrades_bridge(tmp_pa
     with zipfile.ZipFile(common / 'plugins/singleplayer_bridge.mcdr') as archive:
         assert json.loads(archive.read('mcdreforged.plugin.json'))['version'] == '0.3.10'
     assert list((common / 'runtime/install-history').glob('*/singleplayer_bridge.mcdr'))
-    assert json.loads((common / 'config.json').read_text(encoding='utf8'))['token'] == config['token']
+    assert read_bridge_config(common / 'mcdr-singleplayer-config.yml')['token'] == config['token']
     assert (world / 'level.dat').read_bytes() == b'keep-world'
 
 

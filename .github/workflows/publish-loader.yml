@@ -68,7 +68,6 @@ jobs:
           path: |
             dist/*.jar
             dist/*.sha256
-            mod-builds/**/build-manifest.json
       - name: Attach JAR and checksum to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

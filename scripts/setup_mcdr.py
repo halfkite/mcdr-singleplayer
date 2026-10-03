@@ -43,6 +43,7 @@ def main():
     sys.path.insert(0, str(runtime))
     from singleplayer_bridge.profiles import ensure_profile
     from singleplayer_bridge.bootstrap import configure_common
+    from singleplayer_bridge.config_file import read as read_bridge_config, write as write_bridge_config
     from singleplayer_bridge.layout import migrate_legacy
     common.mkdir(parents=True, exist_ok=True)
     migrate_legacy(common)
@@ -71,11 +72,21 @@ def main():
     shutil.copy2(plugins[0], plugin_dir / 'singleplayer_bridge.mcdr')
     shutil.copytree(runtime, runtime_root / 'bridge-runtime', dirs_exist_ok=True)
     configure_common(common, Path(sys.executable), runtime_root / 'bridge-runtime')
-    config_path = config_dir / 'config.json'
-    bridge = json.loads(config_path.read_text(encoding='utf-8-sig')) if config_path.exists() else dict(enabled=True, port=25585, token=secrets.token_hex(32))
+    config_path = config_dir / 'mcdr-singleplayer-config.yml'
+    old_config_path = config_dir / 'config.json'
+    if not config_path.exists() and old_config_path.is_file():
+        bridge = read_bridge_config(old_config_path)
+        write_bridge_config(config_path, bridge)
+        history = runtime_root / 'migration-history'
+        history.mkdir(parents=True, exist_ok=True)
+        old_config_path.replace(history / f'config-json-before-yaml-{time.time_ns()}.json')
+    else:
+        bridge = read_bridge_config(config_path) if config_path.exists() else dict(enabled=True, port=25585, token=secrets.token_hex(32))
     bridge.pop('mcdrDirectory', None)
+    if not isinstance(bridge.get('token'), str) or len(bridge['token']) < 32:
+        bridge['token'] = secrets.token_hex(32)
     bridge['autoStartMcdr'] = False
-    config_path.write_text(json.dumps(bridge, ensure_ascii=False, indent=2) + '\n', encoding='utf8')
+    write_bridge_config(config_path, bridge)
     profile = ensure_profile(common, world)
     if args.player:
         yaml = YAML()

@@ -9,6 +9,8 @@ import secrets
 from datetime import datetime
 from pathlib import Path
 from generate_compat import ROOT, MATRIX, generate, write
+sys.path.insert(0, str(ROOT / 'python'))
+from singleplayer_bridge.config_file import write as write_bridge_config
 
 
 def prepare(loader, row):
@@ -18,9 +20,9 @@ def prepare(loader, row):
     project.mkdir(parents=True, exist_ok=True)
     run = project / ('run-' + datetime.now().strftime('%Y%m%d-%H%M%S'))
     run.mkdir(exist_ok=True)
-    config = run / 'mcdr-singleplayer/config.json'
+    config = run / 'mcdr-singleplayer/mcdr-singleplayer-config.yml'
     config.parent.mkdir(exist_ok=True)
-    write(config, json.dumps({'enabled': True, 'autoStartMcdr': False, 'autoInstall': False, 'token': secrets.token_hex(32), 'port': 25585}))
+    write_bridge_config(config, {'enabled': True, 'autoStartMcdr': False, 'autoInstall': False, 'token': secrets.token_hex(32), 'port': 25585})
     write(run / 'options.txt', 'pauseOnLostFocus:false\nrenderDistance:2\nsimulationDistance:2\nmaxFps:30\nlang:en_us\nskipMultiplayerWarning:true\n')
     for name in ('settings.gradle', 'gradle.properties'):
         shutil.copy2(generated / name, project / name)

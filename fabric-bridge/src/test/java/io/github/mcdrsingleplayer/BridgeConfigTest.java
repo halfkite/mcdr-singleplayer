@@ -19,22 +19,23 @@ class BridgeConfigTest {
     @Test void freshConfigExistsOnlyInDedicatedRoot() throws Exception {
         var config = BridgeConfig.loadForGame(game);
         assertEquals(64, config.token.length());
-        assertTrue(Files.isRegularFile(game.resolve("mcdr-singleplayer/config.json")));
+        Path path = game.resolve("mcdr-singleplayer/mcdr-singleplayer-config.yml");
+        assertTrue(Files.isRegularFile(path));
+        assertTrue(Files.readString(path).contains("# 随机身份验证令牌，请勿分享或公开"));
         assertFalse(Files.exists(game.resolve("config")));
     }
 
     @Test void pythonOnboardingPreferencesSurviveClientRestart() throws Exception {
         var initial = BridgeConfig.loadForGame(game);
         Path path = BridgeConfig.pathForGame(game);
-        var saved = JsonParser.parseString(Files.readString(path)).getAsJsonObject();
-        saved.addProperty("onboardingDismissed", true);
-        saved.addProperty("onboardingLastClientId", "last-client");
-        Files.writeString(path, saved.toString());
+        String saved = Files.readString(path).replace("onboardingDismissed: false", "onboardingDismissed: true")
+                .replace("onboardingLastClientId: \"\"", "onboardingLastClientId: \"last-client\"");
+        Files.writeString(path, saved);
         var reopened = BridgeConfig.loadForGame(game);
         assertTrue(reopened.onboardingDismissed);
         assertEquals("last-client", reopened.onboardingLastClientId);
         assertEquals(initial.token, reopened.token);
-        assertTrue(JsonParser.parseString(Files.readString(path)).getAsJsonObject().get("onboardingDismissed").getAsBoolean());
+        assertTrue(Files.readString(path).contains("onboardingDismissed: true"));
     }
 
     @Test void previousRuntimeConfigMovesToSharedRootAndKeepsToken() throws Exception {
@@ -67,7 +68,10 @@ class BridgeConfigTest {
         assertFalse(Files.exists(game.resolve("config/.mcdr_restore_locks.json")));
         Path root = game.resolve("mcdr-singleplayer");
         assertEquals("[\"Old World\"]", Files.readString(root.resolve("runtime/.mcdr_restore_locks.json")));
-        assertFalse(Files.readString(root.resolve("config.json")).contains("mcdrDirectory"));
+        assertFalse(Files.readString(BridgeConfig.pathForGame(game)).contains("mcdrDirectory"));
+        try (var archived = Files.list(root.resolve("runtime/migration-history"))) {
+            assertTrue(archived.findAny().isPresent());
+        }
         assertEquals(common.toString(), JsonParser.parseString(Files.readString(root.resolve("runtime/.legacy-layout.json"))).getAsJsonObject().get("source").getAsString());
     }
 
@@ -81,7 +85,11 @@ class BridgeConfigTest {
         assertEquals(25591, config.port);
         assertEquals("language: en_us\n", Files.readString(root.resolve("config.yml")));
         assertEquals("profile", Files.readString(root.resolve("date/Old World/keep.txt")));
-        assertTrue(Files.exists(root.resolve("config.json")));
+        assertFalse(Files.exists(root.resolve("config.json")));
+        assertTrue(Files.readString(root.resolve("mcdr-singleplayer-config.yml")).contains("port: 25591"));
+        try (var archived = Files.list(root.resolve("runtime/migration-history"))) {
+            assertEquals(1, archived.count());
+        }
         assertFalse(Files.exists(root.resolve("data")));
     }
 

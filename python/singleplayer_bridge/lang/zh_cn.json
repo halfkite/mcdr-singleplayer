@@ -1,5 +1,12 @@
 {
   "mcdr-singleplayer.onboarding.intro": "本模组的数据存在于游戏目录下的 mcdr-singleplayer 文件夹\n单人游戏主玩家自动获得 MCDR 最高的四级权限\n每个存档的插件配置与插件数据都按存档文件夹名称独立保存\n彻底删除存档后，请前往 .\\mcdr-singleplayer\\date 删除对应的存档文件夹",
+  "mcdr-singleplayer.python.required_title": "需要安装 Python",
+  "mcdr-singleplayer.python.required_intro": "当前单人游戏需要 Python 3.10 或更高版本并包含 pip\n检测到安装完成后将自动继续启动 MCDR",
+  "mcdr-singleplayer.python.latest_stable": "当前最新正式稳定版：Python %s",
+  "mcdr-singleplayer.python.install_instructions": "运行安装程序时，进入“Customize installation”并在“Optional Features”页面勾选“pip”\n首页建议勾选“Add python.exe to PATH”，便于模组检测 Python",
+  "mcdr-singleplayer.python.windows_direct": "Windows 64 位 [直链]",
+  "mcdr-singleplayer.python.windows_mirror": "Windows 64 位 [镜像源]",
+  "mcdr-singleplayer.python.other_systems": "其他系统的 Python 下载页面",
   "mcdr-singleplayer.onboarding.warning": "注意！！！ 本模组处于初步测试阶段，在借助本模组在单人游戏使用MCDR备份插件前请务必确保你有其余的完整备份！！！",
   "mcdr-singleplayer.onboarding.recommend": "推荐安装 ",
   "mcdr-singleplayer.onboarding.prime": "增量备份 Prime Backup",

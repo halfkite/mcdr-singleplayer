@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from singleplayer_bridge import onboarding, plugin
+from singleplayer_bridge.config_file import read as read_bridge_config, write as write_bridge_config
 from singleplayer_bridge.bootstrap import pack
 from singleplayer_bridge.profiles import ensure_profile, read_json, write_json
 
@@ -17,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def welcome(tmp_path, monkeypatch):
     common = tmp_path / 'common'
     (common / 'plugins').mkdir(parents=True)
-    write_json(common / 'config.json', {'token': 'keep-this-token', 'custom': 9})
+    write_bridge_config(common / 'mcdr-singleplayer-config.yml', {'token': 'keep-this-token', 'custom': 9})
     monkeypatch.setenv('MCDR_BRIDGE_COMMON', str(common))
     monkeypatch.setenv('MCDR_BRIDGE_HOST', 'Main')
     monkeypatch.setenv('MCDR_BRIDGE_LANGUAGE', 'zh_cn')
@@ -55,7 +56,7 @@ def test_fresh_prompt_links_warning_and_no_settings_before_install(welcome):
     assert '/!!spbridge install chunk_backup' in clicks
     assert onboarding.PB_PAGE in clicks and onboarding.CB_PAGE in clicks
     assert '/!!spbridge config backup on' not in clicks
-    assert read_json(common / 'config.json')['token'] == 'keep-this-token'
+    assert read_bridge_config(common / 'mcdr-singleplayer-config.yml')['token'] == 'keep-this-token'
     count = len(messages)
     onboarding.prompt(server)
     assert len(messages) == count
@@ -84,7 +85,7 @@ def test_ignore_is_common_and_force_show_does_not_clear_it(welcome, monkeypatch)
     assert messages == []
     onboarding.prompt(server, force=True)
     assert len(messages) > 0
-    saved = read_json(common / 'config.json')
+    saved = read_bridge_config(common / 'mcdr-singleplayer-config.yml')
     assert saved['onboardingDismissed'] and saved['custom'] == 9
 
 

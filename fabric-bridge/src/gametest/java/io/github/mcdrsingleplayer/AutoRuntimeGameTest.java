@@ -22,7 +22,7 @@ public final class AutoRuntimeGameTest implements FabricClientGameTest {
         if (commonPath == null) return;
         Path game = FabricLoader.getInstance().getGameDir().toAbsolutePath();
         Path common = game.resolve("mcdr-singleplayer");
-        BridgeGameTest.check(Files.isRegularFile(common.resolve("config.json")), "Mod config is outside shared root");
+        BridgeGameTest.check(Files.isRegularFile(common.resolve("mcdr-singleplayer-config.yml")), "Mod config is outside shared root");
         BridgeGameTest.check(Files.isDirectory(common.resolve("runtime")) && Files.isDirectory(common.resolve("log")), "Runtime and log folders are missing");
         BridgeGameTest.check(!Files.exists(game.resolve("config/mcdr_singleplayer_bridge.json")), "Legacy mod config was recreated");
         BridgeGameTest.check(!Files.exists(common.resolve("worlds")), "Profile layout still has a worlds intermediate folder");

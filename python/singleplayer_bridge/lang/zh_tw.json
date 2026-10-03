@@ -1,5 +1,12 @@
 {
   "mcdr-singleplayer.onboarding.intro": "本模組的資料存在於遊戲目錄下的 mcdr-singleplayer 資料夾\n單人遊戲主玩家自動獲得 MCDR 最高的四級權限\n每個存檔的外掛配置與外掛資料都按存檔資料夾名稱獨立儲存\n徹底刪除存檔後，請前往 .\\mcdr-singleplayer\\date 刪除對應的存檔資料夾",
+  "mcdr-singleplayer.python.required_title": "需要安裝 Python",
+  "mcdr-singleplayer.python.required_intro": "目前的單人遊戲需要 Python 3.10 或更新版本並包含 pip\n偵測到安裝完成後會自動繼續啟動 MCDR",
+  "mcdr-singleplayer.python.latest_stable": "目前最新正式穩定版：Python %s",
+  "mcdr-singleplayer.python.install_instructions": "執行安裝程式時，進入「Customize installation」並在「Optional Features」頁面勾選「pip」\n首頁建議勾選「Add python.exe to PATH」，方便模組偵測 Python",
+  "mcdr-singleplayer.python.windows_direct": "Windows 64 位元 [直連]",
+  "mcdr-singleplayer.python.windows_mirror": "Windows 64 位元 [鏡像源]",
+  "mcdr-singleplayer.python.other_systems": "其他系統的 Python 下載頁面",
   "mcdr-singleplayer.onboarding.warning": "注意！！！ 本模組處於初步測試階段，在藉助本模組在單人遊戲使用MCDR備份外掛前請務必確保你有其餘的完整備份！！！",
   "mcdr-singleplayer.onboarding.recommend": "推薦安裝 ",
   "mcdr-singleplayer.onboarding.prime": "增量備份 Prime Backup",

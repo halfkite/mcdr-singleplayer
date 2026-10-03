@@ -8,6 +8,7 @@ from pathlib import Path
 from mcdreforged.api.rtext import RAction, RColor, RText, RTextList
 
 from .backup_guard import checked_path
+from .config_file import read as read_bridge_config, write as write_bridge_config
 from .profiles import read_json, write_json
 from .i18n import tr, locale
 
@@ -45,12 +46,12 @@ def archives(common, plugin_id):
 
 
 def common_preferences(**changes):
-    path = checked_path(Path(os.environ['MCDR_BRIDGE_COMMON']), 'config.json')
+    path = checked_path(Path(os.environ['MCDR_BRIDGE_COMMON']), 'mcdr-singleplayer-config.yml')
     with _preferences_lock:
-        config = read_json(path) if path.exists() else {}
+        config = read_bridge_config(path)
         if changes:
             config.update(changes)
-            write_json(path, config)
+            write_bridge_config(path, config)
         return config
 
 

@@ -46,7 +46,7 @@ def main():
     settings.update(language='en_us', advanced_console=False, working_directory='.', encoding='utf8', decoding='utf8',
                     plugin_directories=[str(config_dir / 'plugins')])
     settings['start_command'] = [sys.executable, str(root / 'python/bridge_proxy.py'), '--config',
-                                str(args.game_dir / 'mcdr-singleplayer/config.json')]
+                                str(args.game_dir / 'mcdr-singleplayer/mcdr-singleplayer-config.yml')]
     with (work / 'config.yml').open('w', encoding='utf8') as out:
         yaml.dump(settings, out)
     permissions = yaml.load((work / 'permission.yml').read_text(encoding='utf8'))

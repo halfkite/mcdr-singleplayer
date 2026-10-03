@@ -50,4 +50,4 @@ python .\setup_prime_backup.py --mcdr-dir 'D:\Minecraft\实例目录\mcdr-single
 - 未适配其他备份插件、LAN 多人世界、原生 RCON、自动重进世界或其他加载器。
 - 定时备份仍使用 Prime Backup 原机制；暂停或桥接未连接时不会执行在线备份。没有连接时只有确认存档未被锁定，才允许离线备份。
 
-实测步骤、截图、日志和验证边界见 [Prime Backup 测试记录](PrimeBackup测试记录.md)。
+本页描述当前适配行为与使用边界。可在本地运行仓库中的自动化测试；测试日志、截图和历史记录不随安装包分发。

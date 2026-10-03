@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from singleplayer_bridge import onboarding, plugin
+from singleplayer_bridge.config_file import write as write_bridge_config
 from singleplayer_bridge.i18n import catalog, locale, tr
 from singleplayer_bridge.profiles import write_json
 
@@ -34,7 +35,7 @@ def test_all_three_catalogs_cover_same_keys_and_arguments_without_full_stops():
 def test_chat_and_configuration_use_selected_catalog(tmp_path, monkeypatch, language, word, button):
     common = tmp_path / 'common'
     (common / 'plugins').mkdir(parents=True)
-    write_json(common / 'config.json', {'token': 'preserved'})
+    write_bridge_config(common / 'mcdr-singleplayer-config.yml', {'token': 'preserved'})
     monkeypatch.setenv('MCDR_BRIDGE_COMMON', str(common))
     monkeypatch.setenv('MCDR_BRIDGE_LANGUAGE', language)
     monkeypatch.setenv('MCDR_BRIDGE_CLIENT_ID', 'test-' + language)
