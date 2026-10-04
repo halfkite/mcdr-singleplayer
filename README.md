@@ -52,7 +52,7 @@ MCDR 启动后，聊天栏会提示主玩家的四级权限和可选备份插件
 
 ## 数据目录
 
-模组和 MCDR 的共用文件放在游戏实例的 `mcdr-singleplayer/`；每个存档的数据放在 `date/<存档文件夹名>/`
+模组和 MCDR 的共用文件放在游戏实例的 `mcdr-singleplayer/`；每个存档的数据放在 `plugindata/<存档文件夹名>/`。从旧版本升级时，旧 `date/` 会自动迁移到 `plugindata/`
 
 ```text
 mcdr-singleplayer/
@@ -60,7 +60,7 @@ mcdr-singleplayer/
 ├─ config.yml                    共用 MCDR 配置
 ├─ permission.yml                共用玩家权限
 ├─ plugins/                      共用 MCDR 插件
-├─ date/
+├─ plugindata/
 │  └─ <存档文件夹名>/
 │     ├─ config/<插件 ID>/       插件配置及部分插件数据
 │     ├─ pb_files/               Prime Backup 数据与备份
@@ -69,7 +69,7 @@ mcdr-singleplayer/
 └─ runtime/                      Python、MCDR 与桥接运行环境
 ```
 
-彻底删除存档后，如需清理其插件数据，可删除对应的 `mcdr-singleplayer/date/<存档文件夹名>/`。使用固定绝对路径的第三方插件可能需要单独调整配置
+彻底删除存档后，如需清理其插件数据，可删除对应的 `mcdr-singleplayer/plugindata/<存档文件夹名>/`。使用固定绝对路径的第三方插件可能需要单独调整配置
 
 ## 许可证
 

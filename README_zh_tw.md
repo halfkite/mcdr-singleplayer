@@ -51,7 +51,7 @@ MCDR 啟動後，聊天欄會說明主玩家擁有 MCDR 四級權限，並提供
 
 ## 資料目錄
 
-模組與 MCDR 共用檔案位於遊戲執行個體的 `mcdr-singleplayer/` 目錄；每個存檔的資料位於 `date/<存檔資料夾名稱>/`。
+模組與 MCDR 共用檔案位於遊戲執行個體的 `mcdr-singleplayer/` 目錄；每個存檔的資料位於 `plugindata/<存檔資料夾名稱>/`。從舊版升級時，舊 `date/` 會自動遷移至 `plugindata/`。
 
 ```text
 mcdr-singleplayer/
@@ -59,7 +59,7 @@ mcdr-singleplayer/
 ├─ config.yml                    共用 MCDR 設定
 ├─ permission.yml                共用玩家權限
 ├─ plugins/                      共用 MCDR 外掛
-├─ date/
+├─ plugindata/
 │  └─ <存檔資料夾名稱>/
 │     ├─ config/<外掛 ID>/       外掛設定及部分外掛資料
 │     ├─ pb_files/               Prime Backup 資料與備份
@@ -68,7 +68,7 @@ mcdr-singleplayer/
 └─ runtime/                      Python、MCDR 與橋接執行環境
 ```
 
-永久刪除存檔後，如需一併刪除其外掛資料，可移除對應的 `mcdr-singleplayer/date/<存檔資料夾名稱>/` 目錄。使用固定絕對路徑的第三方外掛可能需要另外調整設定。
+永久刪除存檔後，如需一併刪除其外掛資料，可移除對應的 `mcdr-singleplayer/plugindata/<存檔資料夾名稱>/` 目錄。使用固定絕對路徑的第三方外掛可能需要另外調整設定。
 
 ## 授權條款
 

@@ -17,7 +17,7 @@ def bound(monkeypatch, tmp_path):
     world = tmp_path / 'saves/world'
     world.mkdir(parents=True)
     (world / 'level.dat').write_bytes(b'world')
-    profile = tmp_path / 'mcdr-singleplayer/date/world'
+    profile = tmp_path / 'mcdr-singleplayer/plugindata/world'
     prepare(profile, world)
     monkeypatch.chdir(profile)
     raw = rebind({}, profile, world)

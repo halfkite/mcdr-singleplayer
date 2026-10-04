@@ -51,7 +51,7 @@ If MCDR is still being prepared when you enter a world, a progress screen identi
 
 ## Data Directory
 
-Shared mod and MCDR files are stored in the game instance's `mcdr-singleplayer/` directory. Each save's data is stored under `date/<save folder name>/`.
+Shared mod and MCDR files are stored in the game instance's `mcdr-singleplayer/` directory. Each save's data is stored under `plugindata/<save folder name>/`. When upgrading, the old `date/` directory is migrated automatically.
 
 ```text
 mcdr-singleplayer/
@@ -59,7 +59,7 @@ mcdr-singleplayer/
 ├─ config.yml                    Shared MCDR configuration
 ├─ permission.yml                Shared player permissions
 ├─ plugins/                      Shared MCDR plugins
-├─ date/
+├─ plugindata/
 │  └─ <save folder name>/
 │     ├─ config/<plugin ID>/     Plugin configuration and some plugin data
 │     ├─ pb_files/               Prime Backup data and backups
@@ -68,7 +68,7 @@ mcdr-singleplayer/
 └─ runtime/                      Python, MCDR, and bridge runtime
 ```
 
-After permanently deleting a save, you can remove its `mcdr-singleplayer/date/<save folder name>/` directory to delete its plugin data as well. Third-party plugins that use fixed absolute paths may need their configuration adjusted.
+After permanently deleting a save, you can remove its `mcdr-singleplayer/plugindata/<save folder name>/` directory to delete its plugin data as well. Third-party plugins that use fixed absolute paths may need their configuration adjusted.
 
 ## License
 

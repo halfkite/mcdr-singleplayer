@@ -15,7 +15,7 @@ def test_binding_preserves_prior_config_and_storage_without_touching_save(tmp_pa
     (mcdr / 'plugins').mkdir()
     world = tmp_path / 'saves' / '测试世界'; world.mkdir(parents=True)
     (world / 'level.dat').write_bytes(b'world-do-not-change')
-    pb = mcdr / 'date' / world.name / 'config/prime_backup/config.json'; pb.parent.mkdir(parents=True)
+    pb = mcdr / 'plugindata' / world.name / 'config/prime_backup/config.json'; pb.parent.mkdir(parents=True)
     original = dict(storage_root='./my_existing_backups', debug=True, command=dict(prefix='!!backup'),
                     scheduled_backup=dict(enabled=True, interval='2h'), backup=dict(compress_method='zstd'))
     pb.write_text(json.dumps(original), encoding='utf8')
@@ -40,6 +40,6 @@ def test_missing_adapter_release_is_rejected_before_config_is_changed(tmp_path):
     world = tmp_path / 'world'; world.mkdir()
     (world / 'level.dat').write_bytes(b'test')
     # No bundled artifacts and no release in this intentionally empty source root.
-    with pytest.raises(ValueError, match='complete 0.4.1 release'):
+    with pytest.raises(ValueError, match='complete 0.4.2 release'):
         configure(tmp_path / 'empty-source', mcdr, world)
-    assert not (mcdr / 'date/prime_backup/config.json').exists()
+    assert not (mcdr / 'plugindata/prime_backup/config.json').exists()

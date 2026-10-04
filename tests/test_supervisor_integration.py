@@ -81,12 +81,12 @@ def on_load(server, previous):
             assert read_frame(stream)['token'] == 'a' * 64
             connection.sendall(encode_frame(dict(type='ready', protocol=1, session=session,
                 world_path=str(world), game_version='26.3', players=['Steve'], paused=False)))
-            profile = common / 'date' / name
+            profile = common / 'plugindata' / name
             wait(lambda: (profile / 'config/profile_probe/state.json').exists())
             expected = 2 if index == 2 else 1
             wait(lambda: read_json(profile / 'config/profile_probe/state.json')['loads'] == expected)
             log = common / 'log' / profile.name / 'controller-child.log'
-            wait(lambda: 'singleplayer_prime_backup@0.4.1 loaded' in log.read_text(encoding='utf8'))
+            wait(lambda: 'singleplayer_prime_backup@0.4.2 loaded' in log.read_text(encoding='utf8'))
             assert (common / 'log' / profile.name / 'MCDR.log').is_file()
             assert 'Fail to load' not in log.read_text(encoding='utf8')
             connection.sendall(encode_frame(dict(type='world_stopped', session=session)))
@@ -96,7 +96,7 @@ def on_load(server, previous):
                 controller.tick({})
                 return controller.process is None
             wait(stopped)
-        assert read_json(common / 'date/世界 B/config/profile_probe/state.json')['loads'] == 1
+        assert read_json(common / 'plugindata/世界 B/config/profile_probe/state.json')['loads'] == 1
         for name, digest in shared_before.items():
             assert hashlib.sha256((common / '.' / name).read_bytes()).hexdigest() == digest
     finally:

@@ -17,8 +17,8 @@ def test_manual_setup_keeps_all_settings_in_game_root_and_upgrades_bridge(tmp_pa
     bundle = tmp_path / 'bundle'; (bundle / 'plugins').mkdir(parents=True)
     runtime = bundle / 'runtime'
     shutil.copytree(ROOT / 'python', runtime, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
-    with zipfile.ZipFile(bundle / 'plugins/singleplayer_bridge-0.4.1.mcdr', 'w') as archive:
-        archive.writestr('mcdreforged.plugin.json', json.dumps({'id': 'singleplayer_bridge', 'version': '0.4.1'}))
+    with zipfile.ZipFile(bundle / 'plugins/singleplayer_bridge-0.4.2.mcdr', 'w') as archive:
+        archive.writestr('mcdreforged.plugin.json', json.dumps({'id': 'singleplayer_bridge', 'version': '0.4.2'}))
     command = [sys.executable, str(ROOT / 'scripts/setup_mcdr.py'), '--game-dir', str(game), '--world-dir', str(world),
                '--bundle', str(bundle), '--player', 'TestOwner']
     environment = dict(os.environ, PYTHONUTF8='1')
@@ -30,8 +30,8 @@ def test_manual_setup_keeps_all_settings_in_game_root_and_upgrades_bridge(tmp_pa
     assert config['autoStartMcdr'] is False
     assert len(config['token']) == 64
     assert not (game / 'config').exists()
-    assert (common / 'date').is_dir() and not (common / 'worlds').exists()
-    profile = common / 'date' / world.name
+    assert (common / 'plugindata').is_dir() and not (common / 'worlds').exists()
+    profile = common / 'plugindata' / world.name
     assert (profile / 'config/prime_backup/config.json').is_file()
     assert (common / '.').is_dir()
     launch = (common / 'runtime/start_mcdr.ps1').read_text(encoding='utf-8-sig')
@@ -42,7 +42,7 @@ def test_manual_setup_keeps_all_settings_in_game_root_and_upgrades_bridge(tmp_pa
     result = subprocess.run(command, capture_output=True, text=True, encoding='utf8', env=environment)
     assert result.returncode == 0, result.stderr
     with zipfile.ZipFile(common / 'plugins/singleplayer_bridge.mcdr') as archive:
-        assert json.loads(archive.read('mcdreforged.plugin.json'))['version'] == '0.4.1'
+        assert json.loads(archive.read('mcdreforged.plugin.json'))['version'] == '0.4.2'
     assert list((common / 'runtime/install-history').glob('*/singleplayer_bridge.mcdr'))
     assert read_bridge_config(common / 'mcdr-singleplayer-config.yml')['token'] == config['token']
     assert (world / 'level.dat').read_bytes() == b'keep-world'

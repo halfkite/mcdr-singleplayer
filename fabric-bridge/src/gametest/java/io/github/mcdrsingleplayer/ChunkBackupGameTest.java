@@ -34,7 +34,7 @@ public final class ChunkBackupGameTest implements FabricClientGameTest {
             context.waitFor(client -> PrimeBackupGameTest.contains(log, "Singleplayer world ready"), 1400);
             BridgeGameTest.check(PrimeBackupGameTest.contains(log, "Chunk Backup 2.0.3 singleplayer adapter ready"), "Adapter did not load");
             Path work = Path.of(Files.readString(game.resolve("chunk-backup-test-work.txt")));
-            Path profile = work.resolve("date").resolve(save.getFileName());
+            Path profile = work.resolve("plugindata").resolve(save.getFileName());
             world.getServer().runCommand("setblock 2 -60 2 minecraft:diamond_block");
             context.runOnClient(client -> client.player.connection.sendChat("!!chunk_test_probe " + player));
             context.waitFor(client -> PrimeBackupGameTest.contains(log, "CB_ORIGINAL_GETTER_RESULT"), 800);

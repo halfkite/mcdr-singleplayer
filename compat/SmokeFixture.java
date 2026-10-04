@@ -55,7 +55,7 @@ public final class SmokeFixture @INTERFACE@ {
                     advance(3);
                 }
                 case 3 -> {
-                    if (!contains("Backup completed, ID")) return;
+                    if (!contains("Backup completed, ID") || System.currentTimeMillis() - started < 5000) return;
                     note("backup: completed");
                     Files.writeString(save.resolve("matrix-marker.txt"), "after-backup");
                     client.player.connection.sendChat("!!pb back 1");

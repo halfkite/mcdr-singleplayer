@@ -14,9 +14,9 @@ python ./setup_chunk_backup.py --mcdr-dir 'D:/Minecraft/游戏实例/mcdr-single
 
 脚本创建独立存档配置并安装适配器，已有 Chunk Backup 配置保留；旧配置的路径需要按照下述绑定要求调整。不要在备份或回档任务执行中修改配置、运行脚本或移走插件。
 
-- 配置：`date/<存档文件夹名>/config/chunk_backup/config.json`。
-- 适配器绑定：`date/<存档文件夹名>/config/singleplayer_chunk_backup/config.json`。
-- 备份槽位与回档前备份：`date/<存档文件夹名>/cb_files/`。
+- 配置：`plugindata/<存档文件夹名>/config/chunk_backup/config.json`。
+- 适配器绑定：`plugindata/<存档文件夹名>/config/singleplayer_chunk_backup/config.json`。
+- 备份槽位与回档前备份：`plugindata/<存档文件夹名>/cb_files/`。
 - 任务日志：`log/<存档文件夹名>/chunk_backup/`；MCDR 日志仍在相同存档的日志分类下。
 
 `server_root` 必须指向实际存档父目录，所有维度的 `world_name` 必须等于当前存档文件夹名；26.3 默认区域路径使用 `dimensions/minecraft/<维度>/region`、`entities` 和 `poi`。玩家数据路径也必须位于当前存档内。

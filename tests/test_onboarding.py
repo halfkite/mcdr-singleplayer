@@ -50,7 +50,7 @@ def test_fresh_prompt_links_warning_and_no_settings_before_install(welcome):
     onboarding.prompt(server)
     text = '\n'.join(str(m) for m in messages)
     assert text.count(onboarding.WARNING) == 3
-    assert '.\\mcdr-singleplayer\\date' in text and '四级权限' in text
+    assert '.\\mcdr-singleplayer\\plugindata' in text and '四级权限' in text
     clicks = str(commands(messages))
     assert '/!!spbridge install prime_backup' in clicks
     assert '/!!spbridge install chunk_backup' in clicks

@@ -42,7 +42,7 @@ from pathlib import Path
 from mcdreforged.api.command import Literal
 from mcdreforged.api.command import Text
 from mcdreforged.api.decorator import new_thread
-PLUGIN_METADATA = {'id': 'chunk_test_gate', 'version': '1.0.0', 'dependencies': {'singleplayer_chunk_backup': '==0.4.1'}}
+PLUGIN_METADATA = {'id': 'chunk_test_gate', 'version': '1.0.0', 'dependencies': {'singleplayer_chunk_backup': '==0.4.2'}}
 def on_load(server, prev):
     @new_thread('cb-original-output-probe')
     def probe(source, ctx):
@@ -90,7 +90,7 @@ def on_load(server, prev):
         'core_constant.LOGGING_FILE=os.path.join(os.environ["MCDR_BRIDGE_LOG_DIR"], "MCDR.log"); '
         'from mcdreforged import mcdr_entrypoint; mcdr_entrypoint.entrypoint()')
     return subprocess.run([sys.executable, '-c', entry, 'start', '--config', str(config_dir / 'config.yml'),
-        '--permission', str(config_dir / 'permission.yml')], cwd=work / 'date' / args.world_dir.name,
+        '--permission', str(config_dir / 'permission.yml')], cwd=work / 'plugindata' / args.world_dir.name,
         env=dict(os.environ, PYTHONUTF8='1', MCDR_BRIDGE_LOG_DIR=str(log), MCDR_BRIDGE_RUNTIME=str(work / 'runtime'))).returncode
 
 

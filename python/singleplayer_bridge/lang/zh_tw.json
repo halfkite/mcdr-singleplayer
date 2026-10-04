@@ -1,6 +1,6 @@
 {
   "mcdr-singleplayer.mod_name": "mcdr-singleplayer",
-  "mcdr-singleplayer.onboarding.intro": "本模組的資料存在於遊戲目錄下的 mcdr-singleplayer 資料夾\n單人遊戲主玩家自動獲得 MCDR 最高的四級權限\n每個存檔的外掛配置與外掛資料都按存檔資料夾名稱獨立儲存\n徹底刪除存檔後，請前往 .\\mcdr-singleplayer\\date 刪除對應的存檔資料夾",
+  "mcdr-singleplayer.onboarding.intro": "本模組的資料存在於遊戲目錄下的 mcdr-singleplayer 資料夾\n單人遊戲主玩家自動獲得 MCDR 最高的四級權限\n每個存檔的外掛配置與外掛資料都按存檔資料夾名稱獨立儲存\n徹底刪除存檔後，請前往 .\\mcdr-singleplayer\\plugindata 刪除對應的存檔資料夾",
   "mcdr-singleplayer.python.required_title": "需要安裝 Python",
   "mcdr-singleplayer.python.required_intro": "目前的單人遊戲需要 Python 3.10 或更新版本並包含 pip\n偵測到安裝完成後會自動繼續啟動 MCDR",
   "mcdr-singleplayer.python.close": "關閉",

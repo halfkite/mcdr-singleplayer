@@ -41,7 +41,7 @@ def download_checked(urls, destination, digest, opener=urllib.request.urlopen):
     for url in urls:
         try:
             started = time.monotonic()
-            request = urllib.request.Request(url, headers={'User-Agent': 'MCDR-Singleplayer-Bridge/0.4.1'})
+            request = urllib.request.Request(url, headers={'User-Agent': 'MCDR-Singleplayer-Bridge/0.4.2'})
             with opener(request, timeout=15) as response, temporary.open('wb') as output:
                 total = 0
                 while chunk := response.read(65536):

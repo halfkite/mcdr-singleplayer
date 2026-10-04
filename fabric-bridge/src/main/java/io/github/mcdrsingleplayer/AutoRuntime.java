@@ -107,7 +107,7 @@ final class AutoRuntime {
             pythonStatus = PythonStatus.READY;
             try {
                 Files.createDirectories(common);
-                Path resources = common.resolve("runtime/bootstrap-resources-0.4.1");
+                Path resources = common.resolve("runtime/bootstrap-resources-0.4.2");
                 extract(resources);
                 List<String> command;
                 if (config.autoInstall) command = new ArrayList<>(List.of(python, resources.resolve("bridge_bootstrap.py").toString(),

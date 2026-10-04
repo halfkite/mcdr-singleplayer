@@ -40,7 +40,7 @@ def main():
     write_json(common / 'runtime/.legacy-layout.json', {'source': str(source)})
     migrate_legacy(common)
     profile = ensure_profile(common, world, 'zh_cn')
-    assert profile == common / 'date' / world.name
+    assert profile == common / 'plugindata' / world.name
     config = read_json(profile / 'config/prime_backup/config.json')
     os.chdir(profile)
     set_config_instance(Config.deserialize(config))

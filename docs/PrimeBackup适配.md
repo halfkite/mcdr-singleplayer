@@ -17,9 +17,9 @@ python -m pip install -r .\requirements-prime-backup.txt
 python .\setup_prime_backup.py --mcdr-dir 'D:\Minecraft\实例目录\mcdr-singleplayer' --world-dir 'D:\Minecraft\实例目录\saves\你的存档目录'
 ```
 
-在解压完整安装包的目录执行以上命令。存档目录需包含 `level.dat`。脚本复制适配插件到 MCDR 的 `plugins`，配置 Prime Backup 的 `source_root` 和 `targets`，并启用 `save-off / save-all flush / save-on`；已有 Prime Backup 配置会先按时间保存副本。配置保存在 `mcdr-singleplayer/date/<存档文件夹名>/config/prime_backup/config.json`，备份存储必须在该分类目录中。MCDR 共用设置与插件位于 `mcdr-singleplayer/`。其他配置项保持原值；0.3.3 自动模式的已有数据库由目录迁移流程复制到新分类目录并重新绑定。
+在解压完整安装包的目录执行以上命令。存档目录需包含 `level.dat`。脚本复制适配插件到 MCDR 的 `plugins`，配置 Prime Backup 的 `source_root` 和 `targets`，并启用 `save-off / save-all flush / save-on`；已有 Prime Backup 配置会先按时间保存副本。配置保存在 `mcdr-singleplayer/plugindata/<存档文件夹名>/config/prime_backup/config.json`，备份存储必须在该分类目录中。MCDR 共用设置与插件位于 `mcdr-singleplayer/`。其他配置项保持原值；升级时旧 `date/` 会自动合并迁移到 `plugindata/`。
 
-共用 MCDR 目录必须是所属游戏实例的 `mcdr-singleplayer/`；手动启动使用《安装说明》生成的脚本，工作目录是 `date/<存档文件夹名>/`。
+共用 MCDR 目录必须是所属游戏实例的 `mcdr-singleplayer/`；手动启动使用《安装说明》生成的脚本，工作目录是 `plugindata/<存档文件夹名>/`。
 
 不要给同一个备份数据库混入不同存档。已有数据库如果来自其他世界，建议先保留原数据库，给本世界设置独立的 `storage_root`。适配器会拒绝 `targets` 不同的回档，但相同目录名本身不能证明两个历史存档是同一个世界。
 

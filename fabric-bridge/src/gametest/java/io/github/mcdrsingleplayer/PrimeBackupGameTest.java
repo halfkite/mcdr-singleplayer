@@ -61,7 +61,7 @@ public final class PrimeBackupGameTest implements FabricClientGameTest {
                 context.waitFor(client -> messages.stream().anyMatch(s -> s.contains("Exported backup")), 1600);
                 Path work = Path.of(Files.readString(game.resolve("prime-backup-test-work.txt")));
                 Path exported;
-                try (var files = Files.list(work.resolve("date").resolve(save.getFileName()).resolve("pb_files/export"))) {
+                try (var files = Files.list(work.resolve("plugindata").resolve(save.getFileName()).resolve("pb_files/export"))) {
                     exported = files.filter(p -> p.toString().endsWith(".zip")).findFirst().orElseThrow();
                 }
                 try (var zip = new ZipFile(exported.toFile())) {
@@ -79,7 +79,7 @@ public final class PrimeBackupGameTest implements FabricClientGameTest {
                 context.waitFor(client -> !client.isPaused());
                 // Reload cascades to the dependent adapter through MCDR's dependency manager.
                 console(process, "!!MCDR plugin reload prime_backup");
-                context.waitFor(client -> contains(log, "Plugin singleplayer_prime_backup@0.4.1 reloaded"), 1200);
+                context.waitFor(client -> contains(log, "Plugin singleplayer_prime_backup@0.4.2 reloaded"), 1200);
                 // A detached running world must never become an offline restore target.
                 console(process, "!!MCDR server stop");
                 context.waitFor(client -> contains(log, "Server process stopped with code 0"), 800);

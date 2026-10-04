@@ -1,6 +1,6 @@
 {
   "mcdr-singleplayer.mod_name": "mcdr-singleplayer",
-  "mcdr-singleplayer.onboarding.intro": "Mod data is stored in mcdr-singleplayer under the game directory\nThe singleplayer host receives MCDR owner permission (level 4)\nPlugin settings and data are stored separately by save folder name\nAfter permanently deleting a save, remove its matching folder under .\\mcdr-singleplayer\\date",
+  "mcdr-singleplayer.onboarding.intro": "Mod data is stored in mcdr-singleplayer under the game directory\nThe singleplayer host receives MCDR owner permission (level 4)\nPlugin settings and data are stored separately by save folder name\nAfter permanently deleting a save, remove its matching folder under .\\mcdr-singleplayer\\plugindata",
   "mcdr-singleplayer.python.required_title": "Python is required",
   "mcdr-singleplayer.python.required_intro": "This singleplayer world needs Python 3.10 or newer with pip\nMCDR will start automatically after the installation is detected",
   "mcdr-singleplayer.python.close": "Close",

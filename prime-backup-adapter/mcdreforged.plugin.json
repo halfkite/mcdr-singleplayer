@@ -1,6 +1,6 @@
 {
   "id": "singleplayer_prime_backup",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "name": "Singleplayer Prime Backup Adapter",
   "description": "Bind stock Prime Backup to one integrated-server save, acknowledge saves and close the world before restore.",
   "authors": ["MCDR Singleplayer Bridge contributors"],

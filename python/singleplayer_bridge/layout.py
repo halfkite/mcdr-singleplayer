@@ -38,19 +38,41 @@ def _relocate(source, target, common):
     if source.is_file() and target.is_file() and source.read_bytes() == target.read_bytes():
         source.unlink()
         return
-    conflict = common / 'runtime/migration-history' / f'{time.time_ns()}-{source.name}'
+    conflict = common / 'runtime/migration-history' / f'{time.time_ns()}-{uuid.uuid4().hex}-{source.name}'
     conflict.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(source), str(conflict))
+
+
+def _check_tree_has_no_links(path):
+    path = Path(path)
+    if linked(path):
+        raise ValueError(tr('error.migration_source_link', path.name))
+    if path.is_dir():
+        for item in path.rglob('*'):
+            if linked(item):
+                raise ValueError(tr('error.migration_source_link', item.name))
 
 
 def organize_layout(common):
     """Shared MCDR files stay at root; each save keeps plugins' native relative layout."""
     common = Path(common).resolve()
-    for name in ('date', 'log', 'runtime'):
+    for name in ('log', 'runtime'):
         directory = common / name
         if linked(directory):
             raise ValueError(tr('error.directory_link', name))
         directory.mkdir(exist_ok=True)
+
+    # 0.4.2 renames the per-save plugin-data directory. Merge safely if both
+    # layouts exist, preserving differing files in migration-history.
+    old_profiles, profiles = common / 'date', common / 'plugindata'
+    if old_profiles.exists():
+        _check_tree_has_no_links(old_profiles)
+        if profiles.exists():
+            _check_tree_has_no_links(profiles)
+        _relocate(old_profiles, profiles, common)
+    if linked(profiles):
+        raise ValueError(tr('error.directory_link', profiles.name))
+    profiles.mkdir(exist_ok=True)
 
     for old_config in (common / 'config', common / 'runtime/config'):
         if old_config.exists():
@@ -66,7 +88,7 @@ def organize_layout(common):
             old_config.rmdir()
     old_data = common / 'data'
     if old_data.exists():
-        _relocate(old_data, common / 'date', common)
+        _relocate(old_data, profiles, common)
 
     # Older releases kept the mod settings beside MCDR's shared files as JSON.
     # Convert that file to the named YAML settings file while retaining a copy
@@ -102,7 +124,7 @@ def organize_layout(common):
         '.mcdr_bridge_session.json': 'runtime/.mcdr_bridge_session.json',
         '.controller.lock': 'runtime/.controller.lock',
         '.installation.lock': 'runtime/.installation.lock',
-        '.migration-staging': 'date/.migration-staging',
+        '.migration-staging': 'plugindata/.migration-staging',
     }
     for name, relative in folder_targets.items():
         source = common / name
@@ -116,7 +138,7 @@ def organize_layout(common):
             _relocate(source, common / 'log' / name, common)
 
     for source in list(common.iterdir()):
-        if source.name in {'date', 'log', 'runtime', 'plugins', 'config.json', 'mcdr-singleplayer-config.yml', 'config.yml', 'permission.yml', 'download-sources.json'}:
+        if source.name in {'date', 'plugindata', 'log', 'runtime', 'plugins', 'config.json', 'mcdr-singleplayer-config.yml', 'config.yml', 'permission.yml', 'download-sources.json'}:
             continue
         if source.is_dir() and (source / 'profile.json').is_file():
             world_name = source.name
@@ -135,7 +157,7 @@ def organize_layout(common):
             _relocate(source, common / 'log' / source.name, common)
         else:
             _relocate(source, common / 'runtime/legacy-files' / source.name, common)
-    for profile in (common / 'date').iterdir():
+    for profile in profiles.iterdir():
         if profile.is_dir() and (profile / 'profile.json').is_file():
             migrate_profile_data(profile)
 
@@ -229,7 +251,7 @@ def _migrate_legacy(common):
                 if not (target / '.legacy-import.json').is_file() or read_json(target / '.legacy-import.json').get('source') != str(profile):
                     raise ValueError(tr('error.destination_profile_already_exists_migration_will_not_overwrite_it'))
                 continue
-            staging = common / 'date/.migration-staging' / uuid.uuid4().hex
+            staging = common / 'plugindata/.migration-staging' / uuid.uuid4().hex
             checked_copy(profile, staging)
             pb = staging / 'config/prime_backup/config.json'
             if pb.exists():

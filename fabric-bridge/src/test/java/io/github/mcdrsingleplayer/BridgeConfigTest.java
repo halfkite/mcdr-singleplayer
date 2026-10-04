@@ -21,6 +21,8 @@ class BridgeConfigTest {
         assertEquals(64, config.token.length());
         Path path = game.resolve("mcdr-singleplayer/mcdr-singleplayer-config.yml");
         assertTrue(Files.isRegularFile(path));
+        assertTrue(Files.isDirectory(game.resolve("mcdr-singleplayer/plugindata")));
+        assertFalse(Files.exists(game.resolve("mcdr-singleplayer/date")));
         assertTrue(Files.readString(path).contains("# 随机身份验证令牌，请勿分享或公开"));
         assertFalse(Files.exists(game.resolve("config")));
     }
@@ -84,13 +86,36 @@ class BridgeConfigTest {
         var config = BridgeConfig.loadForGame(game);
         assertEquals(25591, config.port);
         assertEquals("language: en_us\n", Files.readString(root.resolve("config.yml")));
-        assertEquals("profile", Files.readString(root.resolve("date/Old World/keep.txt")));
+        assertEquals("profile", Files.readString(root.resolve("plugindata/Old World/keep.txt")));
         assertFalse(Files.exists(root.resolve("config.json")));
         assertTrue(Files.readString(root.resolve("mcdr-singleplayer-config.yml")).contains("port: 25591"));
         try (var archived = Files.list(root.resolve("runtime/migration-history"))) {
             assertEquals(1, archived.count());
         }
         assertFalse(Files.exists(root.resolve("data")));
+    }
+
+    @Test void oldDateProfilesMoveIntoPluginDataAndPreserveCollisions() throws Exception {
+        Path root = game.resolve("mcdr-singleplayer");
+        Path oldProfile = root.resolve("date/World");
+        Path currentProfile = root.resolve("plugindata/World");
+        Files.createDirectories(oldProfile);
+        Files.createDirectories(currentProfile);
+        Files.writeString(oldProfile.resolve("same.txt"), "same");
+        Files.writeString(currentProfile.resolve("same.txt"), "same");
+        Files.writeString(oldProfile.resolve("conflict.txt"), "old data");
+        Files.writeString(currentProfile.resolve("conflict.txt"), "current data");
+        Files.writeString(oldProfile.resolve("only-old.txt"), "keep this");
+
+        BridgeConfig.loadForGame(game);
+
+        assertFalse(Files.exists(root.resolve("date")));
+        assertEquals("same", Files.readString(currentProfile.resolve("same.txt")));
+        assertEquals("current data", Files.readString(currentProfile.resolve("conflict.txt")));
+        assertEquals("keep this", Files.readString(currentProfile.resolve("only-old.txt")));
+        try (var archived = Files.list(root.resolve("runtime/migration-history"))) {
+            assertEquals(1, archived.filter(path -> path.getFileName().toString().endsWith("-conflict.txt")).count());
+        }
     }
 
     @Test void liveOldRestoreBlocksMigrationBeforeAnyFilesMove() throws Exception {

@@ -1,6 +1,6 @@
 {
   "id": "singleplayer_bridge",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "name": "Singleplayer Bridge",
   "description": "Connect MCDR plugins to a singleplayer integrated server through a local bridge.",
   "authors": ["MCDR Singleplayer Bridge contributors"],

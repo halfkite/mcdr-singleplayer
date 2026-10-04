@@ -31,7 +31,7 @@ public final class LanguageGameTest implements FabricClientGameTest {
                 BridgeGameTest.check(context.computeOnClient(client -> Component.translatable("mcdr-singleplayer.restore.title.completed").getString()).equals(expectedTitle), "Native restore translation failed: " + language);
                 messages.clear();
                 var world = context.worldBuilder().create();
-                var profile = common.resolve("date").resolve(world.getWorldSave().getSaveDirectory().getFileName());
+                var profile = common.resolve("plugindata").resolve(world.getWorldSave().getSaveDirectory().getFileName());
                 var log = common.resolve("log").resolve(profile.getFileName()).resolve("controller-child.log");
                 try (world) {
                     context.waitFor(client -> PrimeBackupGameTest.contains(log, "Singleplayer world ready"), 2400);

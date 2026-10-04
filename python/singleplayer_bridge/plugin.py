@@ -63,7 +63,7 @@ def profile_list(source):
     if not common:
         source.reply(tr('command.auto_required'))
         return
-    names = sorted(p.name for p in (Path(common) / 'date').iterdir() if p.is_dir() and not p.name.startswith('.') and (p / 'profile.json').is_file()) if (Path(common) / 'date').is_dir() else []
+    names = sorted(p.name for p in (Path(common) / 'plugindata').iterdir() if p.is_dir() and not p.name.startswith('.') and (p / 'profile.json').is_file()) if (Path(common) / 'plugindata').is_dir() else []
     source.reply(tr('command.profiles', ', '.join(names)))
 
 

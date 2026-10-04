@@ -28,7 +28,7 @@ final class BridgeConfig {
     static BridgeConfig loadForGame(Path game) throws IOException {
         Path path = pathForGame(game);
         Path root = rootForGame(game);
-        for (String directory : new String[]{"date", "log", "runtime"}) {
+        for (String directory : new String[]{"log", "runtime"}) {
             Path child = root.resolve(directory);
             if (Files.isSymbolicLink(child)) throw new IOException("mcdr-singleplayer folders cannot be links");
             Files.createDirectories(child);
@@ -112,6 +112,20 @@ final class BridgeConfig {
     private static void migrateGroupedDirectories(Path root) throws IOException {
         Path runtime = root.resolve("runtime");
         Path oldData = root.resolve("data");
+        Path oldProfiles = root.resolve("date");
+        Path profiles = root.resolve("plugindata");
+        if (Files.exists(oldProfiles, LinkOption.NOFOLLOW_LINKS)) {
+            ensureControllerStopped(runtime);
+            ensureTreeHasNoLinks(oldProfiles);
+            if (Files.exists(profiles, LinkOption.NOFOLLOW_LINKS)) ensureTreeHasNoLinks(profiles);
+            moveMerge(oldProfiles, profiles, runtime);
+        }
+        if (Files.exists(oldData, LinkOption.NOFOLLOW_LINKS)) {
+            ensureControllerStopped(runtime);
+            ensureTreeHasNoLinks(oldData);
+            if (Files.exists(profiles, LinkOption.NOFOLLOW_LINKS)) ensureTreeHasNoLinks(profiles);
+            moveMerge(oldData, profiles, runtime);
+        }
         for (Path oldConfig : new Path[]{root.resolve("config"), runtime.resolve("config")}) {
             if (!Files.exists(oldConfig, LinkOption.NOFOLLOW_LINKS)) continue;
             if (Files.isSymbolicLink(oldConfig)) throw new IOException("Legacy shared config cannot be a link");
@@ -137,11 +151,36 @@ final class BridgeConfig {
             }
             Files.delete(oldConfig);
         }
-        if (Files.exists(oldData, LinkOption.NOFOLLOW_LINKS)) moveMerge(oldData, root.resolve("date"), runtime);
+        if (Files.isSymbolicLink(profiles)) throw new IOException("Per-save plugin data cannot be a link");
+        Files.createDirectories(profiles);
+    }
+
+    private static void ensureControllerStopped(Path runtime) throws IOException {
+        for (String lockName : new String[]{".controller.lock", ".installation.lock"}) {
+            Path lockFile = runtime.resolve(lockName);
+            if (!Files.exists(lockFile, LinkOption.NOFOLLOW_LINKS)) continue;
+            try (var channel = java.nio.channels.FileChannel.open(lockFile, java.nio.file.StandardOpenOption.WRITE)) {
+                try (var lock = channel.tryLock(0, 1, false)) {
+                    if (lock == null) throw new IOException("MCDR is running; close the other client before migrating per-save data");
+                } catch (java.nio.channels.OverlappingFileLockException e) {
+                    throw new IOException("MCDR is running; per-save data migration is blocked", e);
+                }
+            }
+        }
+    }
+
+    private static void ensureTreeHasNoLinks(Path root) throws IOException {
+        if (Files.isSymbolicLink(root)) throw new IOException("Per-save data migration cannot follow links");
+        if (!Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)) return;
+        try (var paths = Files.walk(root)) {
+            for (Path path : paths.toList())
+                if (Files.isSymbolicLink(path)) throw new IOException("Per-save data migration cannot follow links");
+        }
     }
 
     private static void moveMerge(Path source, Path target, Path runtime) throws IOException {
         if (Files.isSymbolicLink(source)) throw new IOException("Legacy MCDR folders cannot be links");
+        if (Files.isSymbolicLink(target)) throw new IOException("MCDR migration destination cannot be a link");
         if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
             Files.move(source, target);
             return;
@@ -159,6 +198,7 @@ final class BridgeConfig {
             return;
         }
         Path history = runtime.resolve("migration-history");
+        if (Files.isSymbolicLink(history)) throw new IOException("Migration history cannot be a link");
         Files.createDirectories(history);
         Files.move(source, history.resolve(java.util.UUID.randomUUID() + "-" + source.getFileName()));
     }
@@ -236,7 +276,7 @@ final class BridgeConfig {
         String contents = """
                 # MCDR Singleplayer bridge settings / 单人游戏 MCDR 桥接设置
                 # These settings apply to this game instance; plugin data remains separated by save.
-                # 本设置作用于当前游戏实例；各存档的插件配置和数据仍分别保存在 date/<存档文件夹名>。
+                # 本设置作用于当前游戏实例；各存档的插件配置和数据仍分别保存在 plugindata/<存档文件夹名>。
                 # Edit values below, then restart the game to apply changes.
                 # 修改下列数值后重启游戏生效。
                 # 启用单人游戏与 MCDR 的桥接

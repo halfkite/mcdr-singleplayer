@@ -1,6 +1,6 @@
 {
   "mcdr-singleplayer.mod_name": "mcdr-singleplayer",
-  "mcdr-singleplayer.onboarding.intro": "本模组的数据存在于游戏目录下的 mcdr-singleplayer 文件夹\n单人游戏主玩家自动获得 MCDR 最高的四级权限\n每个存档的插件配置与插件数据都按存档文件夹名称独立保存\n彻底删除存档后，请前往 .\\mcdr-singleplayer\\date 删除对应的存档文件夹",
+  "mcdr-singleplayer.onboarding.intro": "本模组的数据存在于游戏目录下的 mcdr-singleplayer 文件夹\n单人游戏主玩家自动获得 MCDR 最高的四级权限\n每个存档的插件配置与插件数据都按存档文件夹名称独立保存\n彻底删除存档后，请前往 .\\mcdr-singleplayer\\plugindata 删除对应的存档文件夹",
   "mcdr-singleplayer.python.required_title": "需要安装 Python",
   "mcdr-singleplayer.python.required_intro": "当前单人游戏需要 Python 3.10 或更高版本并包含 pip\n检测到安装完成后将自动继续启动 MCDR",
   "mcdr-singleplayer.python.close": "关闭",

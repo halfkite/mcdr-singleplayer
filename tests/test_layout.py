@@ -50,7 +50,7 @@ def test_034_layout_is_grouped_and_default_config_backups_are_removed(tmp_path):
 
     organize_layout(common)
 
-    assert {'date', 'log', 'runtime', 'config.yml', 'plugins'} <= {path.name for path in common.iterdir()}
+    assert {'plugindata', 'log', 'runtime', 'config.yml', 'plugins'} <= {path.name for path in common.iterdir()}
     migrated_config = common / 'mcdr-singleplayer-config.yml'
     assert read_bridge_config(migrated_config)['enabled'] is True
     assert read_bridge_config(migrated_config)['token'] == 'a' * 64
@@ -60,16 +60,53 @@ def test_034_layout_is_grouped_and_default_config_backups_are_removed(tmp_path):
     assert (common / 'config.yml').is_file()
     assert (common / 'plugins/probe.py').read_text() == 'plugin'
     assert (common / 'runtime/bootstrap-resources-0.3.4/bridge_bootstrap.py').is_file()
-    assert (common / 'date/World/profile.json').is_file()
+    assert (common / 'plugindata/World/profile.json').is_file()
     assert (common / 'log/controller.log').read_text() == 'log'
     assert not list(common.rglob('config.yml.before-*'))
+
+
+def test_042_old_date_directory_is_renamed_to_plugindata(tmp_path):
+    common = tmp_path / 'mcdr-singleplayer'
+    old_profile = common / 'date/测试存档'
+    old_profile.mkdir(parents=True)
+    (old_profile / 'profile.json').write_text('{"folder":"测试存档"}')
+    (old_profile / 'pb_files').mkdir()
+    (old_profile / 'pb_files/backup.db').write_bytes(b'unchanged backup database')
+
+    organize_layout(common)
+
+    assert not (common / 'date').exists()
+    assert (common / 'plugindata/测试存档/profile.json').is_file()
+    assert (common / 'plugindata/测试存档/pb_files/backup.db').read_bytes() == b'unchanged backup database'
+
+
+def test_042_date_merge_keeps_existing_files_and_archives_conflicts(tmp_path):
+    common = tmp_path / 'mcdr-singleplayer'
+    old_profile = common / 'date/world'
+    new_profile = common / 'plugindata/world'
+    old_profile.mkdir(parents=True)
+    new_profile.mkdir(parents=True)
+    (old_profile / 'same.txt').write_text('identical')
+    (new_profile / 'same.txt').write_text('identical')
+    (old_profile / 'conflict.txt').write_text('old value')
+    (new_profile / 'conflict.txt').write_text('new value')
+    (old_profile / 'only-old.txt').write_text('preserve me')
+
+    organize_layout(common)
+
+    assert not (common / 'date').exists()
+    assert (new_profile / 'same.txt').read_text() == 'identical'
+    assert (new_profile / 'conflict.txt').read_text() == 'new value'
+    assert (new_profile / 'only-old.txt').read_text() == 'preserve me'
+    archived = list((common / 'runtime/migration-history').glob('*-conflict.txt'))
+    assert len(archived) == 1 and archived[0].read_text() == 'old value'
 
 
 def test_migration_preserves_database_policies_sources_and_rebinds_storage(tmp_path):
     common, source, old, world = fixture(tmp_path)
     migrate_legacy(common)
     profile = ensure_profile(common, world)
-    assert profile == common / 'date' / world.name
+    assert profile == common / 'plugindata' / world.name
     config = read_json(profile / 'config/prime_backup/config.json')
     assert config['storage_root'] == './pb_files'
     assert config['enabled'] is False
@@ -82,7 +119,7 @@ def test_migration_preserves_database_policies_sources_and_rebinds_storage(tmp_p
     assert (common / 'config.yml').read_text() == (source / 'config.yml').read_text()
     assert (common / 'plugins/probe.py').read_bytes() == (source / 'plugins/probe.py').read_bytes()
     assert read_json(common / 'runtime/.legacy-layout.json')['completed']
-    assert {'date', 'log', 'runtime', 'config.yml', 'plugins'} <= {path.name for path in common.iterdir()}
+    assert {'plugindata', 'log', 'runtime', 'config.yml', 'plugins'} <= {path.name for path in common.iterdir()}
     assert (world / 'level.dat').read_bytes() == b'untouched-world'
     migrate_legacy(common)
     assert not list((profile / 'config/prime_backup').glob('config.json.before-*'))
@@ -92,7 +129,7 @@ def test_migration_does_not_overwrite_existing_profile_or_common_settings(tmp_pa
     common, source, old, world = fixture(tmp_path)
     (common / 'runtime/config').mkdir(parents=True)
     (common / 'runtime/config/config.yml').write_text('new-config')
-    destination = common / 'date' / world.name; destination.mkdir(parents=True)
+    destination = common / 'plugindata' / world.name; destination.mkdir(parents=True)
     (destination / 'keep').write_text('existing-data')
     with pytest.raises(ValueError, match='already exists'):
         migrate_legacy(common)
@@ -121,7 +158,7 @@ def test_interrupted_migration_resumes_only_its_committed_profiles(tmp_path):
     write_json(common / 'runtime/.legacy-layout.json', marker)
     migrate_legacy(common)
     assert read_json(common / 'runtime/.legacy-layout.json')['completed']
-    assert (common / 'date' / world.name / 'pb_files/blob').read_bytes() == b'backup-pool-content'
+    assert (common / 'plugindata' / world.name / 'pb_files/blob').read_bytes() == b'backup-pool-content'
 
 
 def test_036_shared_files_and_backup_store_move_without_changing_database(tmp_path):
@@ -160,7 +197,7 @@ def test_036_shared_files_and_backup_store_move_without_changing_database(tmp_pa
 
 
 def test_backup_store_collision_is_rejected_without_merging_files(tmp_path):
-    profile = tmp_path / 'date/world'
+    profile = tmp_path / 'plugindata/world'
     old = profile / 'data/prime_backup'; old.mkdir(parents=True)
     native = profile / 'pb_files'; native.mkdir()
     (old / 'db').write_bytes(b'old-store')
@@ -187,4 +224,4 @@ def test_running_current_controller_blocks_shared_file_migration(tmp_path):
 
 @pytest.mark.parametrize('name', ['plugins', 'runtime', 'log', 'config'])
 def test_world_names_can_match_top_level_group_names(tmp_path, name):
-    assert profile_path(tmp_path, name) == tmp_path / 'date' / name
+    assert profile_path(tmp_path, name) == tmp_path / 'plugindata' / name

@@ -32,7 +32,7 @@ def child(root, name):
 
 
 def profile_path(common, name):
-    return child(Path(common) / 'date', name)
+    return child(Path(common) / 'plugindata', name)
 
 
 def linked(path):

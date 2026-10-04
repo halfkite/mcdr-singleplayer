@@ -26,17 +26,19 @@ def configure(root, mcdr, world, copy_adapter=False, *, profile_dir=None):
         bundle = Path(__file__).resolve().parent
         artifacts = list((bundle / 'adapters').glob('singleplayer_prime_backup-*.mcdr'))
         if not artifacts:
-            artifacts = list((root / 'dist').glob('singleplayer_prime_backup-0.4.1.mcdr'))
+            artifacts = list((root / 'dist').glob('singleplayer_prime_backup-0.4.2.mcdr'))
         if len(artifacts) != 1:
-            raise ValueError('Extract the complete 0.4.1 release bundle before running this script')
+            raise ValueError('Extract the complete 0.4.2 release bundle before running this script')
     # profile_dir is used by the isolated integration harness, whose cwd is already a profile.
-    profile = profile_dir.resolve() if profile_dir is not None else mcdr / 'date' / world.name
+    profile = profile_dir.resolve() if profile_dir is not None else mcdr / 'plugindata' / world.name
     if profile_dir is None:
         import sys
         runtime = mcdr / 'runtime/bridge-runtime'
         source = root / 'python'
         sys.path.insert(0, str(runtime if runtime.is_dir() else source))
+        from singleplayer_bridge.layout import migrate_legacy
         from singleplayer_bridge.profiles import profile_path, read_json, write_json
+        migrate_legacy(mcdr)
         profile = profile_path(mcdr, world.name)
         metadata = profile / 'profile.json'
         if metadata.exists() and Path(read_json(metadata)['world_path']).resolve() != world:

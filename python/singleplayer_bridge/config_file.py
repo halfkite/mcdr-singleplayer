@@ -95,7 +95,7 @@ def write(path, config):
     lines = [
         '# MCDR Singleplayer bridge settings / 单人游戏 MCDR 桥接设置',
         '# These settings apply to this game instance; plugin data remains separated by save.',
-        '# 本设置作用于当前游戏实例；各存档的插件配置和数据仍分别保存在 date/<存档文件夹名>。',
+        '# 本设置作用于当前游戏实例；各存档的插件配置和数据仍分别保存在 plugindata/<存档文件夹名>。',
         '# Edit values below, then restart the game to apply changes.',
         '# 修改下列数值后重启游戏生效。',
     ]
