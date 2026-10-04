@@ -5,7 +5,7 @@
 [![Minecraft versions](https://cf.way2muchnoise.eu/versions/For%20MC_1723660_all.svg)](https://www.curseforge.com/projects/1723660)
 [![GitHub downloads](https://img.shields.io/github/downloads/halfkite/mcdr-singleplayer/total?logo=github)](https://github.com/halfkite/mcdr-singleplayer/releases)
 
-[简体中文](README.md) | [繁體中文](README_zh_tw.md) | **English**
+[简体中文](https://github.com/halfkite/mcdr-singleplayer/blob/main/README.md) | [繁體中文](https://github.com/halfkite/mcdr-singleplayer/blob/main/README_zh_tw.md) | **English**
 
 [Issues](https://github.com/halfkite/mcdr-singleplayer/issues) | [MCDReforged](https://mcdreforged.com/) | [Prime Backup](https://mcdreforged.com/en/plugin/prime_backup) | [Chunk Backup](https://mcdreforged.com/en/plugin/chunk_backup)
 
