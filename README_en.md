@@ -44,10 +44,16 @@ If MCDR is still being prepared when you enter a world, a progress screen identi
 ## Features
 
 - Forward in-game chat, player join and leave events, and world start and stop events to MCDR plugins; relay commands and their responses
+- Support one- and two-character Carpet bot names such as `1` and `ab`, so short names do not interrupt the bridge connection
 - Register loaded MCDR plugin root commands, aliases, subcommands, arguments, and suggestions as client-side `/!!` commands; update them when plugins are loaded, unloaded, or reloaded
 - Isolate plugin configuration, plugin data, and backups by save-folder name, and start the matching MCDR environment when switching saves
 - Adapt Prime Backup and Chunk Backup for singleplayer; show restore progress and prevent opening the target save until restoration is complete
+- Check Windows file locks before restoration, report the blocked file and stop if it remains locked; close configuration readers left open by Syncmatica 0.3.20
+- Adapt Conflux Map 0.1.6 by keeping native libraries outside saves in separate caches for each game process, preventing loaded DLLs from blocking restores when multiple clients run
 - Support Simplified Chinese, Traditional Chinese, and English, following the client language
+- Keep temporary sessions separate when multiple clients use the same game directory, so LAN guests do not interrupt the host's MCDR; guests can use the host's `/!!` commands and Tab completion with their own MCDR permissions
+
+A shared directory controls one singleplayer world at a time. Other local worlds wait for it to become available, including until pending backup or restore tasks finish. Joining a LAN world does not reserve the controller
 
 ## Data Directory
 

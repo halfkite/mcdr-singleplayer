@@ -14,6 +14,7 @@ import net.minecraft.world.level.block.Blocks;
 /** Exercises official Chunk Backup, candy_tools, MCDR, file restore and the actual menu monitor. */
 public final class ChunkBackupGameTest implements FabricClientGameTest {
     @Override public void runTest(ClientGameTestContext context) {
+        if (MultiClientGameTest.selected()) return;
         String archive = System.getenv("MCDR_BRIDGE_TEST_CHUNK_BACKUP");
         if (archive == null) return;
         Path project = Path.of(System.getenv("MCDR_BRIDGE_TEST_ROOT"));

@@ -64,6 +64,7 @@ def on_load(server, previous):
     write_json(game_config, dict(enabled=True, token='a' * 64, port=listener.getsockname()[1]))
     controller = Controller(common, game_config, tmp_path / 'session.json', 'test', sys.executable)
     connections = []
+    guest = None
     try:
         controller.tick({})
         assert controller.process is None
@@ -86,9 +87,28 @@ def on_load(server, previous):
             expected = 2 if index == 2 else 1
             wait(lambda: read_json(profile / 'config/profile_probe/state.json')['loads'] == expected)
             log = common / 'log' / profile.name / 'controller-child.log'
-            wait(lambda: 'singleplayer_prime_backup@0.4.2 loaded' in log.read_text(encoding='utf8'))
+            wait(lambda: 'singleplayer_prime_backup@0.5.1 loaded' in log.read_text(encoding='utf8'))
             assert (common / 'log' / profile.name / 'MCDR.log').is_file()
             assert 'Fail to load' not in log.read_text(encoding='utf8')
+            if index == 0:
+                # Starting another client while the real MCDR host is live must wait
+                # without rewriting its configuration or terminating the host child.
+                attempted = subprocess.run([sys.executable, str(ROOT / 'python/bridge_bootstrap.py'),
+                    '--common', str(common), '--resources', str(tmp_path / 'not-needed-while-locked'),
+                    '--client-id', 'guest'], capture_output=True, timeout=20)
+                assert attempted.returncode == 2, attempted.stderr.decode('utf8', errors='replace')
+                assert read_json(common / 'runtime/clients/guest/install-progress.json')['stage'] == 'waiting_instance'
+                guest_state = tmp_path / 'guest.json'
+                write_json(guest_state, dict(client_id='guest', world_path=None, session=None))
+                guest = subprocess.Popen([sys.executable, str(ROOT / 'python/bridge_supervisor.py'),
+                    '--common', str(common), '--config', str(game_config), '--state', str(guest_state),
+                    '--client-id', 'guest', '--parent-pid', str(os.getpid())],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                time.sleep(0.6)
+                assert guest.poll() is None
+                assert controller.process.poll() is None and not controller.retiring
+                for shared, digest in shared_before.items():
+                    assert hashlib.sha256((common / shared).read_bytes()).hexdigest() == digest
             connection.sendall(encode_frame(dict(type='world_stopped', session=session)))
             connection.close()
             stream.close()
@@ -100,6 +120,9 @@ def on_load(server, previous):
         for name, digest in shared_before.items():
             assert hashlib.sha256((common / '.' / name).read_bytes()).hexdigest() == digest
     finally:
+        if guest:
+            guest.terminate()
+            guest.wait(10)
         for connection in connections:
             connection.close()
         listener.close()
@@ -113,3 +136,4 @@ def on_load(server, previous):
                     process.kill()
                 controller.process.kill()
                 controller.process.wait()
+        controller.close()

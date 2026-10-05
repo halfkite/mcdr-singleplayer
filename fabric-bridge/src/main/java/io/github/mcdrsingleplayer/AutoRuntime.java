@@ -21,6 +21,7 @@ final class AutoRuntime {
     private String session;
     private String hostPlayer;
     private String language;
+    private int bridgePort;
     private volatile boolean closing;
     private volatile PythonStatus pythonStatus = PythonStatus.CHECKING;
     private volatile InstallProgress installProgress = new InstallProgress("preparing", 0);
@@ -30,8 +31,9 @@ final class AutoRuntime {
 
     AutoRuntime(BridgeConfig config, Path gameConfig, Path gameDirectory) {
         this.config = config;
+        this.bridgePort = config.port;
         this.gameConfig = gameConfig.toAbsolutePath();
-        this.stateFile = BridgeConfig.runtimeForGame(gameDirectory).resolve(".mcdr_bridge_session.json");
+        this.stateFile = BridgeConfig.runtimeForGame(gameDirectory).resolve("clients").resolve(clientId).resolve("session.json");
         common = BridgeConfig.rootForGame(gameDirectory).toAbsolutePath().normalize();
     }
 
@@ -45,6 +47,11 @@ final class AutoRuntime {
         this.hostPlayer = hostPlayer;
         this.language = language;
         publish(world, session);
+    }
+
+    synchronized void publish(String world, String session, String hostPlayer, String language, int port) {
+        bridgePort = port;
+        publish(world, session, hostPlayer, language);
     }
 
     synchronized void closing() {
@@ -79,6 +86,7 @@ final class AutoRuntime {
         data.addProperty("session", session);
         data.addProperty("host_player", hostPlayer);
         data.addProperty("language", language);
+        data.addProperty("bridge_port", bridgePort);
         data.add("setup_requests", setupRequests.deepCopy());
         try {
             Files.createDirectories(stateFile.getParent());
@@ -107,7 +115,7 @@ final class AutoRuntime {
             pythonStatus = PythonStatus.READY;
             try {
                 Files.createDirectories(common);
-                Path resources = common.resolve("runtime/bootstrap-resources-0.4.2");
+                Path resources = common.resolve("runtime/bootstrap-resources-0.5.1");
                 extract(resources);
                 List<String> command;
                 if (config.autoInstall) command = new ArrayList<>(List.of(python, resources.resolve("bridge_bootstrap.py").toString(),
@@ -116,24 +124,26 @@ final class AutoRuntime {
                 command.addAll(List.of("--config", gameConfig.toString(), "--state", stateFile.toString(),
                         "--client-id", clientId, "--parent-pid", Long.toString(ProcessHandle.current().pid())));
                 Files.createDirectories(common.resolve("log"));
-                Process process = new ProcessBuilder(command).redirectErrorStream(true)
-                        .redirectOutput(ProcessBuilder.Redirect.appendTo(common.resolve("log/bootstrap.log").toFile())).start();
                 LOGGER.info("MCDR controller starting; shared directory: {}. Installation progress: bootstrap.log", common);
-                if (!config.autoInstall) installProgress = new InstallProgress("starting", 0);
-                Path progressFile = common.resolve("runtime/install-progress.json");
                 while (!closing) {
-                    if (config.autoInstall) {
+                    Process process = new ProcessBuilder(command).redirectErrorStream(true)
+                            .redirectOutput(ProcessBuilder.Redirect.appendTo(common.resolve("log/bootstrap.log").toFile())).start();
+                    if (!config.autoInstall) installProgress = new InstallProgress("starting", 0);
+                    Path progressFile = stateFile.resolveSibling("install-progress.json");
+                    while (!closing) {
                         try {
                             if (Files.isRegularFile(progressFile) && Files.size(progressFile) <= 4096) {
                                 InstallProgress value = InstallProgress.parse(Files.readString(progressFile), clientId);
                                 if (value != null) installProgress = value;
                             }
                         } catch (IOException ignored) { /* Retain the last stage during atomic replacement. */ }
+                        if (process.waitFor(500, TimeUnit.MILLISECONDS)) {
+                            if (!closing) installProgress = new InstallProgress(process.exitValue() == 2 ? "waiting_instance" : "failed", 0);
+                            break;
+                        }
                     }
-                    if (process.waitFor(500, TimeUnit.MILLISECONDS)) {
-                        if (!closing) installProgress = new InstallProgress("failed", 0);
-                        break;
-                    }
+                    if (closing || process.exitValue() != 2) break;
+                    Thread.sleep(1000);
                 }
             } catch (Exception e) {
                 installProgress = new InstallProgress("failed", 0);
@@ -152,7 +162,11 @@ final class AutoRuntime {
                     Path target = destination.resolve(entry.getName()).normalize();
                     if (!target.startsWith(destination) || entry.isDirectory()) continue;
                     Files.createDirectories(target.getParent());
-                    Files.copy(zip, target, StandardCopyOption.REPLACE_EXISTING);
+                    Path temporary = Files.createTempFile(target.getParent(), "mcdr-resource-", ".tmp");
+                    try {
+                        Files.copy(zip, temporary, StandardCopyOption.REPLACE_EXISTING);
+                        Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                    } finally { Files.deleteIfExists(temporary); }
                 }
             }
         }

@@ -13,7 +13,8 @@ CHECKED_PREFIX = '__bridge_request__'
 COMPLETION_PREFIX = '__bridge_complete__'
 TREE_PREFIX = '__bridge_commands__'
 SAVE_AND_QUIT = '__bridge_save_and_quit__'
-PLAYER_PATTERN = re.compile(r'[A-Za-z0-9_]{3,16}')
+# Carpet fake players and offline profiles may have one- or two-character names.
+PLAYER_PATTERN = re.compile(r'[A-Za-z0-9_]{1,16}')
 EVENT_TYPES = frozenset({
     'ready', 'world_info', 'chat', 'player_joined', 'player_left', 'log',
     'command_result', 'pause', 'heartbeat', 'world_stopped', 'error', 'suggest_request',

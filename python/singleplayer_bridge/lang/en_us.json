@@ -189,7 +189,7 @@
   "mcdr-singleplayer.install.title": "MCDR installation and startup",
   "mcdr-singleplayer.install.intro": "MCDR installation or startup is still in progress\nClosing this screen will not stop installation\nMCDR commands and backup plugins become available when setup finishes",
   "mcdr-singleplayer.install.ready_intro": "MCDR is installed and connected to this singleplayer world\nYou can now use MCDR commands and installed plugins",
-  "mcdr-singleplayer.install.failed_intro": "MCDR installation or startup failed\nCheck install.log and bootstrap.log in mcdr-singleplayer/log\nResolve the issue and restart the game to try again",
+  "mcdr-singleplayer.install.failed_intro": "MCDR installation or startup failed\nCheck the logs in mcdr-singleplayer/log\nFor startup or connection failures, also check controller-child.log in the save's log subfolder\nResolve the issue and restart the game to try again",
   "mcdr-singleplayer.install.chat": "[mcdr-singleplayer] MCDR progress: %s",
   "mcdr-singleplayer.install.attempt": " (dependency download source %s)",
   "mcdr-singleplayer.install.stage.preparing": "Checking and preparing the installation environment",
@@ -198,7 +198,13 @@
   "mcdr-singleplayer.install.stage.files": "Preparing MCDR bridge files",
   "mcdr-singleplayer.install.stage.config": "Preparing MCDR configuration",
   "mcdr-singleplayer.install.stage.plugins": "Preparing bridge plugins and backup adapters",
+  "mcdr-singleplayer.install.stage.waiting_instance": "Another client is using or installing MCDR; waiting for it to safely release the shared directory",
   "mcdr-singleplayer.install.stage.starting": "Installation checks complete, starting and connecting to this world",
   "mcdr-singleplayer.install.stage.ready": "MCDR is ready for commands and installed plugins",
-  "mcdr-singleplayer.install.stage.failed": "Installation or startup failed, check mcdr-singleplayer/log and restart the game to retry"
+  "mcdr-singleplayer.install.stage.failed": "Installation or startup failed, check mcdr-singleplayer/log and restart the game to retry",
+  "mcdr-singleplayer.restore.stage.waiting_files": "Waiting for world files to be released",
+  "mcdr-singleplayer.error.restore_file_still_in_use": "World file is still in use or cannot be replaced: %s — close the program using it (Minecraft may need to exit completely) and retry the restore",
+  "mcdr-singleplayer.error.restore_directory_still_in_use": "Cannot move world folder %s — close File Explorer windows showing the world or its subfolders and other programs using it, then retry the restore",
+  "mcdr-singleplayer.error.restore_native_library_in_use": "Native library is still in use: %s — fully exit Minecraft clients using this game directory before retrying; returning to the main menu may not unload a DLL",
+  "mcdr-singleplayer.error.restore_backup_has_no_level_dat": "This restore backup does not contain a regular level.dat file"
 }

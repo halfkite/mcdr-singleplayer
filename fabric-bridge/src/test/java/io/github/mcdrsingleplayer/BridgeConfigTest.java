@@ -10,6 +10,24 @@ import org.junit.jupiter.api.io.TempDir;
 class BridgeConfigTest {
     @TempDir Path game;
 
+    @Test void simultaneousFirstLaunchesShareOneToken() throws Exception {
+        try (var workers = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first = workers.submit(() -> BridgeConfig.loadForGame(game));
+            var second = workers.submit(() -> BridgeConfig.loadForGame(game));
+            assertEquals(first.get().token, second.get().token);
+            assertEquals(first.get().token, BridgeConfig.loadForGame(game).token);
+        }
+    }
+
+    @Test void currentYamlAndCustomCommentsAreNotRewrittenOnSecondLaunch() throws Exception {
+        BridgeConfig.loadForGame(game);
+        Path path = BridgeConfig.pathForGame(game);
+        String contents = Files.readString(path) + "# User comment\n";
+        Files.writeString(path, contents);
+        BridgeConfig.loadForGame(game);
+        assertEquals(contents, Files.readString(path));
+    }
+
     private Path legacy() throws Exception {
         Path path = game.resolve("config/mcdr_singleplayer_bridge.json");
         BridgeConfig.load(path);

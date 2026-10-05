@@ -38,5 +38,27 @@ def test_installer_reports_failure_or_waits_for_connection_without_claiming_read
     monkeypatch.setattr(bootstrap, 'install', install)
     monkeypatch.setattr(bootstrap.subprocess, 'Popen', lambda *args, **kwargs: SimpleNamespace(wait=lambda: 0))
     assert bootstrap.main() == (1 if fails else 0)
-    status = json.loads((tmp_path / 'runtime/install-progress.json').read_text())
+    status = json.loads(bootstrap.InstallationProgress(tmp_path, 'this-client').path.read_text())
     assert status == dict(protocol=1, client_id='this-client', stage='failed' if fails else 'starting', attempt=0)
+
+
+def test_second_installer_waits_without_changing_host_feedback_or_runtime(tmp_path, monkeypatch):
+    host = bootstrap.InstallationProgress(tmp_path, 'host')
+    host.report('starting')
+    before = host.path.read_bytes()
+    monkeypatch.setattr(sys, 'argv', ['bridge_bootstrap.py', '--common', str(tmp_path), '--resources', str(tmp_path),
+                                    '--client-id', 'guest'])
+    monkeypatch.setattr(bootstrap, 'install', lambda *args, **kwargs: pytest.fail('Do not rewrite an active runtime'))
+    lease = supervisor.lock_common(tmp_path)
+    try:
+        assert bootstrap.main() == 2
+        assert host.path.read_bytes() == before
+        guest = bootstrap.InstallationProgress(tmp_path, 'guest')
+        assert json.loads(guest.path.read_text())['stage'] == 'waiting_instance'
+    finally:
+        lease.close()
+
+
+def test_progress_client_id_cannot_escape_its_runtime_directory(tmp_path):
+    with pytest.raises(ValueError):
+        bootstrap.InstallationProgress(tmp_path, '../host')

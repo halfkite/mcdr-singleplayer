@@ -48,7 +48,7 @@ def configure_host(common, player, language):
 
 
 class Controller:
-    def __init__(self, common, game_config, state_file, client_id, python=None):
+    def __init__(self, common, game_config, state_file, client_id, python=None, progress=None):
         self.common = Path(common).resolve()
         self.game_config = Path(game_config).resolve()
         self.state_file = Path(state_file).resolve()
@@ -59,6 +59,36 @@ class Controller:
         self.retiring = False
         self.output = None
         self.setup_requests = set()
+        self.lease = None
+        self.progress = progress or (lambda stage: None)
+
+    def acquire(self):
+        if self.lease is not None:
+            return True
+        try:
+            installation = lock_common(self.common, '.installation.lock')
+        except OSError:
+            self.progress('waiting_instance')
+            return False
+        try:
+            self.lease = lock_common(self.common)
+        except OSError:
+            self.progress('waiting_instance')
+            return False
+        finally:
+            installation.close()
+        return True
+
+    def close(self):
+        self.retire()
+        if self.process:
+            self.process.wait()  # Keep the lease until outstanding restore tasks finish.
+            self.process.stdin.close()
+            self.output.close()
+            self.process = None
+        if self.lease:
+            self.lease.close()
+            self.lease = None
 
     def retire(self):
         if self.process and self.process.poll() is None and not self.retiring:
@@ -81,9 +111,12 @@ class Controller:
             self.retire()
             return
         if self.process is None and desired != self.session:
+            if desired and not self.acquire():
+                return
             self.session = desired
             self.retiring = False
             if desired:
+                self.progress('starting')
                 language = state.get('language', 'en_us')
                 player = state.get('host_player', '')
                 configure_host(self.common, player, language)
@@ -98,6 +131,11 @@ class Controller:
                 self.output = (world_log / 'controller-child.log').open('a', encoding='utf8')
                 environment['MCDR_BRIDGE_RUNTIME'] = str(self.common / 'runtime')
                 environment['MCDR_BRIDGE_LOG_DIR'] = str(world_log)
+                if 'bridge_port' in state:
+                    port = state['bridge_port']
+                    if type(port) is not int or not 1 <= port <= 65535:
+                        raise ValueError('Invalid client bridge port')
+                    environment['MCDR_BRIDGE_PORT'] = str(port)
                 mcdr_entrypoint = ('import os; from mcdreforged.constants import core_constant; '
                     'core_constant.LOGGING_FILE=os.path.join(os.environ["MCDR_BRIDGE_LOG_DIR"], "MCDR.log"); '
                     'from mcdreforged import mcdr_entrypoint; mcdr_entrypoint.entrypoint()')
@@ -107,6 +145,9 @@ class Controller:
                     stderr=subprocess.STDOUT, text=True, encoding='utf8',
                     creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
                 logging.info('MCDR profile started: %s', profile.name)
+            elif self.lease:
+                self.lease.close()
+                self.lease = None
         for request in state.get('setup_requests', [])[:64]:
             if not (self.process and not self.retiring and self.process.poll() is None
                     and request.get('id') not in self.setup_requests and request.get('session') == self.session):
@@ -118,7 +159,7 @@ class Controller:
             elif action == 'owner':
                 import re
                 player = request.get('player', '')
-                if re.fullmatch('[A-Za-z0-9_]{3,16}', player):
+                if re.fullmatch('[A-Za-z0-9_]{1,16}', player):
                     self.process.stdin.write(f'!!MCDR permission set {player} owner\n')
             self.process.stdin.flush()
             self.setup_requests.add(request.get('id'))
@@ -128,17 +169,22 @@ def lock_common(common, name='.controller.lock'):
     runtime = Path(common) / 'runtime'
     runtime.mkdir(parents=True, exist_ok=True)
     handle = (runtime / name).open('a+b')
-    handle.seek(0)
-    if os.name == 'nt':
-        import msvcrt
-        if handle.read(1) == b'':
-            handle.write(b'0')
-            handle.flush()
+    try:
         handle.seek(0)
-        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-    else:
-        import fcntl
-        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if os.name == 'nt':
+            import msvcrt
+            # Reading the locked byte fails on Windows even before try-lock.
+            if os.fstat(handle.fileno()).st_size == 0:
+                handle.write(b'0')
+                handle.flush()
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BaseException:
+        handle.close()
+        raise
     return handle
 
 
@@ -157,12 +203,9 @@ def main():
     (args.common / 'log').mkdir(parents=True, exist_ok=True)
     logging.basicConfig(filename=args.common / 'log/controller.log', level=logging.INFO,
                         format='%(asctime)s %(levelname)s %(message)s', encoding='utf8')
-    try:
-                lock = lock_common(args.common)
-    except OSError:
-        logging.error('Another Minecraft instance already controls this shared MCDR directory')
-        return 2
-    controller = Controller(args.common, args.config, args.state, args.client_id)
+    from .installation_progress import InstallationProgress
+    controller = Controller(args.common, args.config, args.state, args.client_id,
+                            progress=InstallationProgress(args.common, args.client_id).report)
     logging.info('Controller ready; waiting for a singleplayer world')
     try:
         while True:
@@ -185,10 +228,7 @@ def main():
     except Exception:
         logging.exception('Controller failed; waiting for safe shutdown')
     finally:
-        controller.retire()
-        if controller.process:
-            controller.process.wait()  # Never kill a running restore to satisfy a timeout.
-        lock.close()
+        controller.close()
     return 0
 
 

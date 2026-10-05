@@ -57,7 +57,7 @@ final class RestoreTitleOverlay {
                 graphics.centeredText(font, title, width / 2, top, 0xffffffff);
                 graphics.centeredText(font, font.plainSubstrByWidth(value.world() + (value.backup() > 0 ? "  (#" + value.backup() + ")" : ""), textWidth), width / 2, top + 20, 0xffa0a0a0);
                 var stage = Component.translatable("mcdr-singleplayer.restore.stage." + switch (value.stage()) {
-                    case "checking", "saving", "safety_backup", "restoring", "rolling_back", "player_data", "completed", "cancelled" -> value.stage();
+                    case "checking", "saving", "waiting_files", "safety_backup", "restoring", "rolling_back", "player_data", "completed", "cancelled" -> value.stage();
                     default -> "failed";
                 });
                 int stageY = top + 42;

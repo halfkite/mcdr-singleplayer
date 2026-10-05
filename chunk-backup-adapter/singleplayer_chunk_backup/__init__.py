@@ -9,7 +9,7 @@ import time
 import uuid
 from pathlib import Path
 
-from singleplayer_bridge.backup_guard import checked_path, check_tree, check_unlocked
+from singleplayer_bridge.backup_guard import checked_path, check_tree, check_unlocked, wait_restore_ready
 from singleplayer_bridge.restore_progress import RestoreProgress, current_restore, exclusive_backup
 
 _server = None
@@ -120,7 +120,7 @@ def patch(owner, name, make_wrapper):
 def position_wrapper(original):
     @functools.wraps(original)
     def get_position(getter, name):
-        if not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9_]{3,16}', name):
+        if not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9_]{1,16}', name):
             raise RuntimeError(tr('error.invalid_chunk_backup_player_name'))
         binding(getter.config)
         result = bridge().execute_checked(_server, '__bridge_player_data__ ' + name)
@@ -192,9 +192,11 @@ def region_wrapper(original):
             raise RuntimeError(tr('error.invalid_chunk_backup_slot'))
         relative = slot if slot == manager.config.overwrite_storage else Path(manager.region_storage) / slot
         check_tree(checked_path(manager.storage_root, relative))
+        targets = []
         for dimension in info.dimension:
             for folder in manager.config.backup.dimension[dimension]['region_folder']:
-                check_tree(checked_path(world, folder))
+                targets.append(checked_path(world, folder))
+        wait_restore_ready(world, targets, progress=progress)
         if progress is not None:
             # Set modified before upstream creates/deletes/merges any target files.
             rollback = progress.region_attempts > 1
@@ -220,9 +222,11 @@ def player_wrapper(original):
             for value in manager.uuid:
                 uuid.UUID(value)
             check_tree(manager.storage_root)
+            targets = []
             for folders in (manager.config.backup.player_data or {}).values():
                 for folder in folders:
-                    check_tree(checked_path(world.parent, folder))
+                    targets.append(checked_path(world.parent, folder))
+            wait_restore_ready(world, targets, progress=progress)
             if progress is not None:
                 progress.update('restoring')
                 progress.update('player_data')

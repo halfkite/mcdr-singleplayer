@@ -14,6 +14,7 @@ public final class RestoreProgressMonitor implements AutoCloseable {
     private final Path path;
     private final Path lockPath;
     private final Set<String> lockedWorlds = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final java.util.Map<String, String> operationLocks = new java.util.HashMap<>();
     private final java.util.concurrent.ScheduledExecutorService reader;
     private volatile String session;
     private volatile Progress current;
@@ -108,8 +109,20 @@ public final class RestoreProgressMonitor implements AutoCloseable {
             }
             latest = value;
             boolean previouslyLocked = lockedWorlds.contains(value.world());
-            boolean changed = value.status().equals("completed") ? lockedWorlds.remove(value.world())
-                : value.modified() && lockedWorlds.add(value.world());
+            boolean changed = false;
+            if (value.status().equals("completed")) {
+                changed = lockedWorlds.remove(value.world());
+                operationLocks.remove(value.world());
+            } else if (value.modified() && lockedWorlds.add(value.world())) {
+                changed = true;
+                if (value.running()) operationLocks.put(value.world(), value.operation());
+            } else if (!value.running() && !value.modified()
+                    && value.operation().equals(operationLocks.get(value.world()))) {
+                // A failed atomic rename proves this operation never moved the
+                // world. Only undo its own provisional lock, never an older one.
+                changed = lockedWorlds.remove(value.world());
+                operationLocks.remove(value.world());
+            }
             if (changed) saveLocks();
             if (session == null && !value.blocksWorld() && !previouslyLocked) return;
             if (session != null && !session.equals(value.session()) && !previouslyLocked) return;
@@ -140,7 +153,7 @@ public final class RestoreProgressMonitor implements AutoCloseable {
         String detail = record.get("detail").getAsString();
         if (!operation.matches("[a-f0-9]{32}") || world.length() > 255 || detail.length() > 512
                 || !Set.of("running", "completed", "failed", "cancelled").contains(status)
-                || !Set.of("checking", "saving", "safety_backup", "restoring", "rolling_back", "player_data", "completed", "failed", "cancelled").contains(stage)) return null;
+                || !Set.of("checking", "saving", "waiting_files", "safety_backup", "restoring", "rolling_back", "player_data", "completed", "failed", "cancelled").contains(stage)) return null;
         int backup = record.get("backup_id").isJsonNull() ? 0 : record.get("backup_id").getAsInt();
         return new Progress(operation, recordSession, world, backup, stage, status, detail,
             record.get("started_at").getAsLong(), record.get("backend_pid").getAsLong(),

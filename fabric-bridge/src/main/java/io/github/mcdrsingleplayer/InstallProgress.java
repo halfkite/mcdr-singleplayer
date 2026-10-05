@@ -6,7 +6,7 @@ import java.util.Set;
 /** Installer stages, scoped to this client launch rather than an old installation marker. */
 record InstallProgress(String stage, int attempt) {
     private static final Set<String> STAGES = Set.of("preparing", "environment", "dependencies", "files",
-            "config", "plugins", "starting", "ready", "failed");
+            "config", "plugins", "waiting_instance", "starting", "ready", "failed");
 
     boolean running() { return !stage.equals("ready") && !stage.equals("failed"); }
     String translationKey() { return "mcdr-singleplayer.install.stage." + stage; }
@@ -37,7 +37,7 @@ record InstallProgress(String stage, int attempt) {
         }
 
         boolean shouldAnnounce(InstallProgress value, long now) {
-            if (finished) return false;
+            if (finished && !value.stage().equals("failed")) return false;
             if (value.stage().equals("ready")) {
                 finished = true;
                 return announced != null;

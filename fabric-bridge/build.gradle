@@ -45,3 +45,9 @@ fabricApi {
         enableClientGameTests = true
     }
 }
+
+// Optional upstream mods are loaded only by an explicitly configured integration run.
+def testCompatMods = System.getenv('MCDR_BRIDGE_TEST_COMPAT_MODS')
+if (testCompatMods) {
+    dependencies { gametestRuntimeOnly files(testCompatMods.split(java.io.File.pathSeparator)) }
+}

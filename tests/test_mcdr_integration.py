@@ -94,16 +94,23 @@ def on_server_stop(server, code):
                 connection.settimeout(12)
                 assert read_frame(stream)['token'] == token
                 ready = dict(type='ready', session='world-1', protocol=1, game_version='26.3',
-                             world_path=str(tmp_path / '世界'), players=['Steve', 'Alex'], paused=False,
+                             world_path=str(tmp_path / '世界'), players=['Steve', 'Alex', '1'], paused=False,
                              host_player='Alex', language='zh_cn')
                 connection.sendall(encode_frame(ready))
                 wait_until(lambda: trace.exists() and 'startup' in trace.read_text(encoding='utf8'))
                 wait_until(lambda: 'MCDR command tree synchronized' in log_path.read_text(encoding='utf8'))
                 permissions = yaml.load((tmp_path / 'permission.yml').read_text(encoding='utf8'))
                 assert 'Alex' in permissions['owner'] and 'Steve' not in permissions['owner']
+                assert '1' not in permissions['owner']
                 entries = [json.loads(line) for line in trace.read_text(encoding='utf8').splitlines()]
                 assert {'startup': '26.3'} in entries
                 wait_until(lambda: '"join": "Steve"' in trace.read_text(encoding='utf8'))
+                wait_until(lambda: '"join": "1"' in trace.read_text(encoding='utf8'))
+                connection.sendall(encode_frame(dict(type='chat', session='world-1', player='1', text='!!probe')))
+                short_player = receive()
+                assert 'tellraw 1 ' in short_player['command'] and '世界连接成功' in short_player['command']
+                connection.sendall(encode_frame(dict(type='command_result', session='world-1', id=short_player['id'],
+                                                    success=True, text='short-player-ok')))
                 connection.sendall(encode_frame(dict(type='chat', session='world-1', player='Steve', text='!!probe')))
                 request = receive()
                 assert request['session'] == 'world-1'
@@ -116,11 +123,12 @@ def on_server_stop(server, code):
                 assert '世界连接成功' not in denied['command']  # the ordinary user cannot access admin status
                 wait_until(lambda: '"chat": "!!spbridge"' in trace.read_text(encoding='utf8'))
                 entries = [json.loads(line) for line in trace.read_text(encoding='utf8').splitlines()]
-                assert sum(item.get('chat') == '!!probe' for item in entries) == 1
+                assert sum(item.get('chat') == '!!probe' and item.get('player') == 'Steve' for item in entries) == 1
+                assert sum(item.get('chat') == '!!probe' and item.get('player') == '1' for item in entries) == 1
                 assert sum(item.get('join') == 'Steve' for item in entries) == 1
                 process.stdin.write('!!MCDR permission set Steve owner\n!!MCDR plugin reload singleplayer_bridge\n')
                 process.stdin.flush()
-                wait_until(lambda: 'Plugin singleplayer_bridge@0.4.2 reloaded' in log_path.read_text(encoding='utf8'))
+                wait_until(lambda: 'Plugin singleplayer_bridge@0.5.1 reloaded' in log_path.read_text(encoding='utf8'))
                 connection.sendall(encode_frame(dict(type='chat', session='world-1', player='Steve', text='!!spbridge status')))
                 status = receive()
                 assert '26.3' in status['command'] and '世界' in status['command']

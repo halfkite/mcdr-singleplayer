@@ -53,3 +53,23 @@ def test_unicode_and_frame_limit():
     assert decode_frame('{"text":"世界"}'.encode())['text'] == '世界'
     with pytest.raises(ProtocolError):
         decode_frame(b'x' * 65537)
+
+
+@pytest.mark.parametrize('name', ['1', 'ab'])
+def test_short_carpet_player_names_preserve_snapshot_and_player_events(name):
+    ready = dict(type='ready', protocol=1, session='world', game_version='26.3',
+                 world_path='D:/world', host_player='Steve', players=['Steve', name], paused=False)
+    assert validate_event(ready) == ready
+    assert SingleplayerHandler().test_server_startup_done(parse(ready))
+    for kind in ['player_joined', 'player_left', 'chat', 'suggest_request']:
+        event = dict(type=kind, session='world', player=name, text='!!help', id='completion')
+        assert validate_event(event) == event
+        if kind == 'chat':
+            info = parse(event)
+            assert info.is_player and info.player == name
+
+
+@pytest.mark.parametrize('name', ['', 'bad name', '@a', 'x' * 17, 'Steve\n!!MCDR', 'Steve\x00'])
+def test_invalid_player_names_are_still_rejected(name):
+    with pytest.raises(ProtocolError):
+        validate_event(dict(type='player_joined', session='world', player=name))

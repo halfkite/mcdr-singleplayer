@@ -20,6 +20,7 @@ import org.slf4j.Logger;''')
             'ServerMessageEvents.CHAT_MESSAGE.register((message, player, chatType)': 'NeoPlatform.chat((message, player)',
             'message.signedContent()': 'message',
             'ServerMessageEvents.GAME_MESSAGE.register': 'NeoPlatform.gameMessage',
+            'ServerTickEvents.END_SERVER_TICK.register(serverCommands::tick);': 'NeoPlatform.serverTick(serverCommands::tick);',
             'ServerPlayConnectionEvents.JOIN.register((listener, sender, server)': 'NeoPlatform.join((player, server)',
             'ServerPlayConnectionEvents.DISCONNECT.register((listener, server)': 'NeoPlatform.leave((player, server)',
             'listener.player': 'player',
@@ -34,6 +35,9 @@ import org.slf4j.Logger;''')
         }
         for old, new in pairs.items():
             text = text.replace(old, new)
+    elif name == 'ConfluxNativeCacheMixin.java':
+        text = text.replace('FabricLoader.getInstance().getGameDir()',
+                            'net.neoforged.fml.loading.FMLPaths.GAMEDIR.get()')
     elif name == 'ClientCommandTree.java':
         text = text.replace('import com.google.gson.JsonArray;', '''import net.minecraft.commands.Commands;
 import net.minecraft.commands.CommandSourceStack;
@@ -88,6 +92,7 @@ import net.neoforged.neoforge.client.event.*;
 import net.neoforged.neoforge.event.*;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.*;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 final class NeoPlatform {
     static final class Loader {
@@ -108,6 +113,9 @@ final class NeoPlatform {
     }
     static void tick(Consumer<Minecraft> action) {
         NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post event) -> action.accept(Minecraft.getInstance()));
+    }
+    static void serverTick(Consumer<MinecraftServer> action) {
+        NeoForge.EVENT_BUS.addListener((ServerTickEvent.Post event) -> action.accept(event.getServer()));
     }
     static void serverStarted(Consumer<MinecraftServer> action) {
         NeoForge.EVENT_BUS.addListener((ServerStartedEvent event) -> action.accept(event.getServer()));

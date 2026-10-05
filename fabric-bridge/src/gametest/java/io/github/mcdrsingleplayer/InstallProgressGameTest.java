@@ -10,6 +10,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 /** Real rendering and close controls with deterministic installer stages in an isolated world. */
 public final class InstallProgressGameTest implements FabricClientGameTest {
     @Override public void runTest(ClientGameTestContext context) {
+        if (MultiClientGameTest.selected()) return;
         String original = context.computeOnClient(client -> client.getLanguageManager().getSelected());
         boolean pauseOnLostFocus = context.computeOnClient(client -> client.options.pauseOnLostFocus);
         context.runOnClient(client -> client.options.pauseOnLostFocus = false);

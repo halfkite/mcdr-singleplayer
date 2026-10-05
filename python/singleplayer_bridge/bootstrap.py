@@ -14,6 +14,7 @@ import zipfile
 from pathlib import Path
 
 from .profiles import read_json, write_json
+from .installation_progress import InstallationProgress
 
 PRIME_VERSION = '1.13.1'
 PRIME_HASH = '081c91872ff3f6ab438328b96237e5e8db87ebff28e46b909eca804b6320db2b'
@@ -22,26 +23,13 @@ PIP_INDEXES = ['https://pypi.org/simple', 'https://pypi.tuna.tsinghua.edu.cn/sim
 DEFAULT_MIRRORS = ['https://gh-proxy.com/']
 
 
-class InstallationProgress:
-    """Atomic, client-scoped stages for the in-game installer UI; never publish pip output."""
-    def __init__(self, common, client_id):
-        self.path = Path(common) / 'runtime/install-progress.json'
-        self.client_id = client_id
-
-    def report(self, stage, attempt=0):
-        try:
-            write_json(self.path, dict(protocol=1, client_id=self.client_id, stage=stage, attempt=attempt))
-        except OSError:
-            logging.warning('Could not publish installation progress', exc_info=True)
-
-
 def download_checked(urls, destination, digest, opener=urllib.request.urlopen):
     destination = Path(destination)
     temporary = destination.with_name(destination.name + '.download')
     for url in urls:
         try:
             started = time.monotonic()
-            request = urllib.request.Request(url, headers={'User-Agent': 'MCDR-Singleplayer-Bridge/0.4.2'})
+            request = urllib.request.Request(url, headers={'User-Agent': 'MCDR-Singleplayer-Bridge/0.5.1'})
             with opener(request, timeout=15) as response, temporary.open('wb') as output:
                 total = 0
                 while chunk := response.read(65536):
@@ -103,12 +91,12 @@ def configure_common(common, python, runtime):
             yaml.dump(config, output)
 
 
-def install(common, resources, update=False, progress=None):
+def install(common, resources, update=False, progress=None, controller_locked=False):
     progress = progress or (lambda stage, attempt=0: None)
     common, resources = Path(common).resolve(), Path(resources).resolve()
     common.mkdir(parents=True, exist_ok=True)
     from .layout import migrate_legacy
-    migrate_legacy(common)
+    migrate_legacy(common, controller_locked=controller_locked)
     runtime_root = common / 'runtime'
     config_dir = common
     environment = runtime_root / '.bridge-venv'
@@ -195,14 +183,24 @@ def main():
         configure_common(args.common.resolve(), Path(sys.executable), args.common.resolve() / 'runtime/bridge-runtime')
         return 0
     progress = InstallationProgress(args.common, args.client_id)
-    progress.report('preparing')
     try:
         from .supervisor import lock_common
-        installation_lock = lock_common(args.common, '.installation.lock')
         try:
-            active_controller_lock = lock_common(args.common)
-            active_controller_lock.close()
-            python = install(args.common, args.resources, args.update, progress=progress.report)
+            installation_lock = lock_common(args.common, '.installation.lock')
+        except OSError:
+            progress.report('waiting_instance')
+            return 2
+        try:
+            try:
+                active_controller_lock = lock_common(args.common)
+            except OSError:
+                progress.report('waiting_instance')
+                return 2
+            try:
+                progress.report('preparing')
+                python = install(args.common, args.resources, args.update, progress=progress.report, controller_locked=True)
+            finally:
+                active_controller_lock.close()
         finally:
             installation_lock.close()
         if args.state:

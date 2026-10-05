@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing published Release tag (v0.4.2)
+        description: Existing published Release tag (for example 0.5.1)
         required: true
         type: string
       curseforge:

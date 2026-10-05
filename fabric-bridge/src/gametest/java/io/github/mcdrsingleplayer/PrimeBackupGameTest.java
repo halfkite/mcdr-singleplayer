@@ -18,6 +18,7 @@ import net.minecraft.world.item.Items;
 
 public final class PrimeBackupGameTest implements FabricClientGameTest {
     @Override public void runTest(ClientGameTestContext context) {
+        if (MultiClientGameTest.selected()) return;
         String archive = System.getenv("MCDR_BRIDGE_TEST_PRIME_BACKUP");
         if (archive == null) return;
         String python = System.getenv("MCDR_BRIDGE_TEST_PYTHON");
@@ -29,10 +30,30 @@ public final class PrimeBackupGameTest implements FabricClientGameTest {
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> messages.add(message.getString()));
         var world = context.worldBuilder().create();
         Process process = null;
+        Process fileHolder = null;
         Path game = FabricLoader.getInstance().getGameDir().toAbsolutePath();
         Path log = game.resolve(baseline ? "prime-backup-baseline.log" : "prime-backup-adapted.log");
         try {
             Path save = world.getWorldSave().getSaveDirectory().toAbsolutePath();
+            checkConfluxNativeCache(game, save);
+            Path heldConfig = save.resolve("syncmatica/config.json");
+            Files.createDirectories(heldConfig.getParent());
+            if (!Files.exists(heldConfig)) Files.writeString(heldConfig, "{\"test\":true}");
+            if (FabricLoader.getInstance().isModLoaded("syncmatica")) {
+                world.getServer().runOnServer(server -> {
+                    try {
+                        Class<?> mod = Class.forName("ch.endte.syncmatica.Syncmatica");
+                        Object syncContext = mod.getMethod("getContext", net.minecraft.resources.Identifier.class)
+                                .invoke(null, mod.getField("SERVER_CONTEXT").get(null));
+                        // The original 0.3.20 method leaks a reader each time existing
+                        // configuration is loaded; keep the same game process alive.
+                        for (int i = 0; i < 3; i++) syncContext.getClass().getMethod("loadConfiguration").invoke(syncContext);
+                        Path moved = heldConfig.resolveSibling("config.json.handle-test");
+                        Files.move(heldConfig, moved);
+                        Files.move(moved, heldConfig);
+                    } catch (Exception e) { throw new AssertionError("Syncmatica still holds its configuration reader", e); }
+                });
+            }
             String player = context.computeOnClient(client -> client.player.getPlainTextName());
             var args = new ArrayList<String>(java.util.List.of(python, project.resolve("scripts/prime_backup_game_harness.py").toString(),
                     "--game-dir", game.toString(), "--world-dir", save.toString(), "--player", player, "--prime-backup", archive));
@@ -79,7 +100,7 @@ public final class PrimeBackupGameTest implements FabricClientGameTest {
                 context.waitFor(client -> !client.isPaused());
                 // Reload cascades to the dependent adapter through MCDR's dependency manager.
                 console(process, "!!MCDR plugin reload prime_backup");
-                context.waitFor(client -> contains(log, "Plugin singleplayer_prime_backup@0.4.2 reloaded"), 1200);
+                context.waitFor(client -> contains(log, "Plugin singleplayer_prime_backup@0.5.1 reloaded"), 1200);
                 // A detached running world must never become an offline restore target.
                 console(process, "!!MCDR server stop");
                 context.waitFor(client -> contains(log, "Server process stopped with code 0"), 800);
@@ -92,9 +113,62 @@ public final class PrimeBackupGameTest implements FabricClientGameTest {
                 final int before = count(log, "Singleplayer world ready");
                 console(process, "!!MCDR server start");
                 context.waitFor(client -> count(log, "Singleplayer world ready") > before, 1200);
+                if (System.getProperty("os.name").startsWith("Windows")) {
+                    fileHolder = new ProcessBuilder(python, "-c",
+                            "import sys; f=open(sys.argv[1]); print('held',flush=True); sys.stdin.readline(); f.close()", heldConfig.toString())
+                            .redirectErrorStream(true).start();
+                    BridgeGameTest.check(fileHolder.getInputStream().readNBytes(4).length == 4, "Could not hold test file");
+                }
                 context.runOnClient(client -> client.player.connection.sendChat("!!pb back 1"));
                 context.waitFor(client -> messages.stream().anyMatch(s -> s.contains("Please choose within") && s.contains("Confirm restore")), 800);
                 context.runOnClient(client -> client.player.connection.sendChat("!!pb confirm"));
+                if (fileHolder != null) {
+                    BridgeGameTest.awaitAsyncClose(context, closeTasks, client -> client.level == null
+                            && RestoreProgressMonitor.instance.current() != null
+                            && RestoreProgressMonitor.instance.current().status().equals("failed"), 1800);
+                    BridgeGameTest.check(contains(log, "syncmatica/config.json"), "Occupied file was not identified");
+                    BridgeGameTest.check(!RestoreProgressMonitor.instance.current().modified(), "Preflight failure marked the world as modified");
+                    BridgeGameTest.check(!RestoreProgressMonitor.blocks(save.getFileName().toString()), "Unmodified world remained locked after a preflight failure");
+                    BridgeGameTest.check("changed-after-backup".equals(Files.readString(save.resolve("bridge-test-marker.txt"))), "Failed preflight partially deleted the world");
+                    context.waitTicks(5);
+                    context.takeScreenshot("prime-backup-locked-file-failed-return-menu");
+                    context.clickScreenButton("mcdr-singleplayer.restore.button.menu");
+                    context.waitFor(client -> !RestoreProgressMonitor.hasVisibleProgress(), 200);
+                    BridgeGameTest.check(context.computeOnClient(client -> net.fabricmc.fabric.api.client.screen.v1.Screens.getWidgets(client.gui.screen()).stream()
+                            .anyMatch(widget -> widget.visible && widget.active)), "Main menu buttons did not return after failed restore dismissal");
+                    fileHolder.getOutputStream().write('\n');
+                    fileHolder.getOutputStream().flush();
+                    Process reader = fileHolder;
+                    context.waitFor(client -> !reader.isAlive(), 800);
+                    BridgeGameTest.check(reader.exitValue() == 0, "Reader did not release the file");
+                    // Explorer can keep a child directory open with DELETE sharing;
+                    // individual file probes pass, but moving its parent is denied.
+                    fileHolder = new ProcessBuilder(python, "-c",
+                            "import ctypes,sys; from ctypes import wintypes; k=ctypes.WinDLL('kernel32',use_last_error=True); "
+                            + "k.CreateFileW.argtypes=[wintypes.LPCWSTR,wintypes.DWORD,wintypes.DWORD,wintypes.LPVOID,wintypes.DWORD,wintypes.DWORD,wintypes.HANDLE]; "
+                            + "k.CreateFileW.restype=wintypes.HANDLE; k.CloseHandle.argtypes=[wintypes.HANDLE]; "
+                            + "h=k.CreateFileW(sys.argv[1],1,7,None,3,0x02000000,None); assert h != ctypes.c_void_p(-1).value; "
+                            + "print('held',flush=True); sys.stdin.readline(); k.CloseHandle(h)", heldConfig.getParent().toString())
+                            .redirectErrorStream(true).start();
+                    BridgeGameTest.check(fileHolder.getInputStream().readNBytes(4).length == 4, "Could not hold test directory");
+                    console(process, "!!pb back 1 --confirm");
+                    context.waitFor(client -> RestoreProgressMonitor.instance.current() != null
+                            && RestoreProgressMonitor.instance.current().status().equals("failed")
+                            && RestoreProgressMonitor.instance.current().detail().contains("File Explorer"), 1800);
+                    BridgeGameTest.check(!RestoreProgressMonitor.instance.current().modified(), "Failed directory move marked the world as modified");
+                    BridgeGameTest.check(!RestoreProgressMonitor.blocks(save.getFileName().toString()), "Failed directory move permanently locked the intact world");
+                    BridgeGameTest.check("changed-after-backup".equals(Files.readString(save.resolve("bridge-test-marker.txt"))), "Failed directory move changed original files");
+                    fileHolder.getOutputStream().write('\n');
+                    fileHolder.getOutputStream().flush();
+                    Process directoryReader = fileHolder;
+                    context.waitFor(client -> !directoryReader.isAlive(), 800);
+                    BridgeGameTest.check(directoryReader.exitValue() == 0, "Directory handle did not close");
+                    // Older PB versions can leave a partial world after shutil.move
+                    // falls back to copy/rmtree. A verified restore must still work
+                    // even if this bound world's level.dat is already missing.
+                    Files.delete(save.resolve("level.dat"));
+                    console(process, "!!pb back 1 --confirm");
+                }
                 BridgeGameTest.awaitAsyncClose(context, closeTasks, client -> client.level == null && contains(log, "Restore to backup #1 done"), 1800);
                 context.waitFor(client -> client.gui.screen() instanceof net.minecraft.client.gui.screens.TitleScreen && RestoreProgressMonitor.instance.current() != null && RestoreProgressMonitor.instance.current().status().equals("completed"), 800);
                 BridgeGameTest.check(contains(log, "Creating backup of existing files"), "Missing pre-restore backup");
@@ -122,6 +196,7 @@ public final class PrimeBackupGameTest implements FabricClientGameTest {
             BridgeGameTest.check(process.exitValue() == 0, "Prime Backup MCDR exit failed: " + log);
         } catch (IOException e) { throw new AssertionError(e); }
         finally {
+            if (fileHolder != null && fileHolder.isAlive()) fileHolder.destroyForcibly();
             BridgeGameTest.mainBridge().setTestCloseDispatcher(null);
             if (process != null && process.isAlive()) {
                 process.descendants().forEach(child -> child.destroyForcibly());
@@ -136,6 +211,19 @@ public final class PrimeBackupGameTest implements FabricClientGameTest {
     static boolean contains(Path path, String text) {
         try { return Files.exists(path) && Files.readString(path).contains(text); }
         catch (IOException e) { return false; }
+    }
+
+    static void checkConfluxNativeCache(Path game, Path save) {
+        if (!FabricLoader.getInstance().isModLoaded("confluxmap")) return;
+        try {
+            Class<?> library = Class.forName("cn.net.rms.confluxmap.nativepredict.NativeLib");
+            BridgeGameTest.check(Boolean.TRUE.equals(library.getMethod("available").invoke(null)), "Conflux Map native prediction did not load");
+            try (var files = Files.walk(ConfluxNativeCache.directory(game))) {
+                BridgeGameTest.check(files.anyMatch(path -> path.getFileName().toString().endsWith(".dll")
+                        || path.getFileName().toString().endsWith(".so") || path.getFileName().toString().endsWith(".dylib")), "Native library was not cached outside saves");
+            }
+            if (save != null) BridgeGameTest.check(!Files.exists(save.resolve("confluxmap/natives")), "Conflux Map still cached native libraries inside the world");
+        } catch (Exception e) { throw new AssertionError("Conflux Map native-cache compatibility failed", e); }
     }
 
     static int count(Path path, String text) {

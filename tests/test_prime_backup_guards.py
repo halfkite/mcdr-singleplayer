@@ -66,3 +66,18 @@ sys.stdin.readline()
     finally:
         process.communicate('\n', timeout=5)
     check_unlocked(world)
+
+
+def test_partial_world_can_only_be_used_as_a_restore_target(world):
+    config = SimpleNamespace(source_path=world.parent, storage_path=world.parents[1] / 'backups',
+                             backup=SimpleNamespace(targets=[world.name]))
+    (world / 'level.dat').unlink()
+    with pytest.raises(RuntimeError, match='existing Minecraft world'):
+        check_binding(world, config)
+    assert check_binding(world, config, allow_incomplete=True) == world
+
+
+def test_restore_rejects_a_partial_backup_without_level_dat(world):
+    backup = SimpleNamespace(targets=[world.name], files=[SimpleNamespace(path=f'{world.name}/syncmatica/config.json', mode=stat.S_IFREG)])
+    with pytest.raises(RuntimeError, match='level.dat'):
+        check_backup(world, backup)

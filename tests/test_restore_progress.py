@@ -74,6 +74,7 @@ def test_real_adapter_hooks_publish_action_stages_and_failure(monkeypatch, tmp_p
             stages.append(json.loads(path.read_text())['stage'])
     class Export:
         def run(self):
+            current_restore.get().update('restoring')
             stages.append(json.loads(path.read_text())['stage'])
             if fail[0]:
                 raise RuntimeError('verification failure')
@@ -89,11 +90,14 @@ def test_real_adapter_hooks_publish_action_stages_and_failure(monkeypatch, tmp_p
             Export().run()
     class Backup:
         def run(self): pass
+    class Trash:
+        def add(self, *args):
+            raise AssertionError('Non-atomic copy/delete fallback must not run')
     modules = {
         'prime_backup.mcdr.task.backup.create_backup_task': SimpleNamespace(CreateBackupTask=Backup),
         'prime_backup.mcdr.task.backup.restore_backup_task': SimpleNamespace(RestoreBackupTask=Restore),
         'prime_backup.action.create_backup_action': SimpleNamespace(CreateBackupAction=Create),
-        'prime_backup.action.export_backup_action_directory': SimpleNamespace(ExportBackupToDirectoryAction=Export),
+        'prime_backup.action.export_backup_action_directory': SimpleNamespace(ExportBackupToDirectoryAction=Export, _TrashBin=Trash),
     }
     instance = object()
     server = SimpleNamespace(get_plugin_instance=lambda name: instance,
@@ -105,6 +109,7 @@ def test_real_adapter_hooks_publish_action_stages_and_failure(monkeypatch, tmp_p
     monkeypatch.setattr(adapter, 'bridge', lambda: SimpleNamespace(restore_progress_context=lambda: dict(progress_path=str(path), session='s')))
     monkeypatch.setattr(adapter, 'preflight', lambda task, restore=False: world)
     monkeypatch.setattr(adapter, 'check_backup', lambda *args: None)
+    monkeypatch.setattr(adapter, 'wait_restore_ready', lambda *args, **kwargs: None)
     # Patch only this adapter's importer, not Python's global importlib module.
     monkeypatch.setattr(adapter, 'importlib', SimpleNamespace(import_module=lambda name: modules[name]))
     monkeypatch.setitem(sys.modules, 'prime_backup.action.get_backup_action', SimpleNamespace(GetBackupAction=lambda *a, **k: SimpleNamespace(run=lambda: None)))
@@ -117,4 +122,21 @@ def test_real_adapter_hooks_publish_action_stages_and_failure(monkeypatch, tmp_p
     with pytest.raises(RuntimeError, match='verification failure'):
         Restore().run()
     assert json.loads(path.read_text())['status'] == 'failed' and current_restore.get() is None
+    # A new lock appearing after preflight must not let shutil.move partially
+    # delete the original world. Simulate denial of the atomic directory move.
+    (world / 'level.dat').write_bytes(b'original level')
+    trash = Trash()
+    trash.trash_bin_path = tmp_path / 'trash'
+    trash.trashes = []
+    def denied(*args):
+        raise PermissionError('directory rename blocked')
+    import os
+    monkeypatch.setattr(os, 'rename', denied)
+    token = current_restore.set(RestoreProgress({'progress_path': str(path)}, world, 1, logging.getLogger('test')))
+    try:
+        with pytest.raises(PermissionError, match='rename blocked'):
+            trash.add(world, Path(world.name))
+        assert (world / 'level.dat').read_bytes() == b'original level' and not trash.trashes
+    finally:
+        current_restore.reset(token)
     adapter.on_unload(server)

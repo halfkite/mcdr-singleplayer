@@ -25,7 +25,22 @@ final class BridgeConfig {
     static Path configRootForGame(Path game) { return rootForGame(game); }
     static Path pathForGame(Path game) { return configRootForGame(game).resolve("mcdr-singleplayer-config.yml"); }
 
-    static BridgeConfig loadForGame(Path game) throws IOException {
+    static synchronized BridgeConfig loadForGame(Path game) throws IOException {
+        Path runtime = runtimeForGame(game);
+        if (Files.isSymbolicLink(rootForGame(game)) || Files.isSymbolicLink(runtime))
+            throw new IOException("The mcdr-singleplayer configuration cannot be a link");
+        Files.createDirectories(runtime);
+        // Serialize first-install token creation and legacy migration across game processes.
+        Path lockFile = runtime.resolve(".configuration.lock");
+        if (Files.isSymbolicLink(lockFile)) throw new IOException("Configuration lock cannot be a link");
+        try (var channel = java.nio.channels.FileChannel.open(lockFile,
+                java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE);
+             var lock = channel.lock(0, 1, false)) {
+            return loadForGameLocked(game);
+        }
+    }
+
+    private static BridgeConfig loadForGameLocked(Path game) throws IOException {
         Path path = pathForGame(game);
         Path root = rootForGame(game);
         for (String directory : new String[]{"log", "runtime"}) {
@@ -97,8 +112,9 @@ final class BridgeConfig {
             }
         }
         BridgeConfig config = load(path);
-        // Remove retired external-directory settings from the canonical config.
-        writeConfig(path, config);
+        // Leave current YAML untouched: another client's onboarding may update it.
+        String current = Files.readString(path, StandardCharsets.UTF_8);
+        if (current.stripLeading().startsWith("{") || current.contains("mcdrDirectory:")) writeConfig(path, config);
         return config;
     }
 

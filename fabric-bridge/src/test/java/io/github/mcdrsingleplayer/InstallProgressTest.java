@@ -4,6 +4,15 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Test;
 
 class InstallProgressTest {
+    @Test void unexpectedDisconnectAfterReadyAnnouncesFailureOnce() {
+        var feedback = new InstallProgress.Feedback();
+        assertFalse(feedback.shouldAnnounce(new InstallProgress("ready", 0), 1000));
+        var failed = new InstallProgress("failed", 0);
+        assertTrue(feedback.shouldAnnounce(failed, 2000));
+        assertFalse(feedback.shouldAnnounce(failed, 23000));
+        assertFalse(feedback.shouldOpen(failed, true));
+    }
+
     @Test void ignoresPreviousLaunchAndMalformedOrUnknownStages() {
         String status = "{\"protocol\":1,\"client_id\":\"current\",\"stage\":\"dependencies\",\"attempt\":2}";
         assertEquals(new InstallProgress("dependencies", 2), InstallProgress.parse(status, "current"));

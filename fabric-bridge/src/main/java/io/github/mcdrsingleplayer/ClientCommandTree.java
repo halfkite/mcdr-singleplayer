@@ -87,7 +87,7 @@ final class ClientCommandTree {
         if (!greedy) {
             // Custom argument types/recursive redirects keep their complete native behavior.
             node.then(ClientCommands.argument("_mcdr_remaining", StringArgumentType.greedyString())
-                .suggests(this::suggest).executes(command -> forward.apply(command.getSource(), command.getInput())));
+                .executes(command -> forward.apply(command.getSource(), command.getInput())));
         }
         return node;
     }
@@ -97,10 +97,9 @@ final class ClientCommandTree {
             com.mojang.brigadier.suggestion.SuggestionsBuilder builder) {
         BridgeEndpoint bridge = endpoint.get();
         if (bridge == null) return builder.buildFuture();
-        return bridge.suggest(command.getSource().getPlayer().getPlainTextName(), builder.getInput()).thenApply(values -> {
-            var full = builder.createOffset(0);
-            values.forEach(full::suggest);
-            return full.build();
+        String input = builder.getInput();
+        return bridge.suggest(command.getSource().getPlayer().getPlainTextName(), input.startsWith("/") ? input.substring(1) : input).thenApply(values -> {
+            return CommandSuggestions.fromFullCommands(builder, values);
         });
     }
 

@@ -26,9 +26,9 @@ def configure(root, mcdr, world, copy_adapter=False, *, profile_dir=None):
         bundle = Path(__file__).resolve().parent
         artifacts = list((bundle / 'adapters').glob('singleplayer_prime_backup-*.mcdr'))
         if not artifacts:
-            artifacts = list((root / 'dist').glob('singleplayer_prime_backup-0.4.2.mcdr'))
+            artifacts = list((root / 'dist').glob('singleplayer_prime_backup-0.5.1.mcdr'))
         if len(artifacts) != 1:
-            raise ValueError('Extract the complete 0.4.2 release bundle before running this script')
+            raise ValueError('Extract the complete 0.5.1 release bundle before running this script')
     # profile_dir is used by the isolated integration harness, whose cwd is already a profile.
     profile = profile_dir.resolve() if profile_dir is not None else mcdr / 'plugindata' / world.name
     if profile_dir is None:

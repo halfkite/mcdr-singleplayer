@@ -11,6 +11,7 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
@@ -36,6 +37,7 @@ public final class SingleplayerBridge implements ModInitializer {
     private boolean showingMcdrInstallNotice;
     private InstallProgress.Feedback installFeedback = new InstallProgress.Feedback();
     private final ClientCommandTree clientCommands = new ClientCommandTree(() -> endpoint, this::forward);
+    private final ServerCommandTree serverCommands = new ServerCommandTree(() -> endpoint);
     private final Map<ServerLevel, Boolean> previousAutoSave = new HashMap<>();
     private volatile boolean restoreAutoSaveNeeded;
     private java.util.function.Consumer<Runnable> closeDispatcher = action -> Minecraft.getInstance().execute(action);
@@ -74,7 +76,7 @@ public final class SingleplayerBridge implements ModInitializer {
             if (server.isDedicatedServer()) return;
             worldServer = server;
             try {
-                endpoint = new BridgeEndpoint(config.port, config.token, server.getServerVersion(),
+                endpoint = new BridgeEndpoint(runtime != null ? 0 : config.port, config.token, server.getServerVersion(),
                         server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize().toString(),
                         request -> route(server, request));
                 server.getPlayerList().getPlayers().forEach(player -> endpoint.playerJoined(player.getPlainTextName()));
@@ -84,12 +86,14 @@ public final class SingleplayerBridge implements ModInitializer {
                 endpoint.progressPath = BridgeConfig.runtimeForGame(FabricLoader.getInstance().getGameDir()).resolve(".mcdr_restore_progress.json").toAbsolutePath().toString();
                 restoreProgress.session(endpoint.session);
                 if (runtime != null) runtime.publish(server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize().toString(),
-                        endpoint.session, endpoint.hostPlayer, endpoint.language);
-                LOGGER.info("MCDR bridge listening at 127.0.0.1:{} for this world", config.port);
+                        endpoint.session, endpoint.hostPlayer, endpoint.language, endpoint.port());
+                serverCommands.attach(server);
+                LOGGER.info("MCDR bridge listening at 127.0.0.1:{} for this world", endpoint.port());
             } catch (Exception e) {
                 LOGGER.error("MCDR bridge could not open the local port ({})", e.getClass().getSimpleName());
             }
         });
+        ServerTickEvents.END_SERVER_TICK.register(serverCommands::tick);
         // End the control session only after world saving and server shutdown have completed.
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
             if (server != worldServer) return;
@@ -99,6 +103,7 @@ public final class SingleplayerBridge implements ModInitializer {
             previousAutoSave.clear();
             restoreAutoSaveNeeded = false;
             if (old != null) old.close();
+            serverCommands.stop();
             if (runtime != null) runtime.publish(null, null);
         });
         ServerPlayConnectionEvents.JOIN.register((listener, sender, server) -> {
@@ -267,7 +272,7 @@ public final class SingleplayerBridge implements ModInitializer {
             // Read both values in one server tick; plugin adapters need no translated NBT text.
             if (command.startsWith("__bridge_player_data__ ")) {
                 String name = command.substring("__bridge_player_data__ ".length());
-                if (!name.matches("[A-Za-z0-9_]{3,16}")) {
+                if (!name.matches("[A-Za-z0-9_]{1,16}")) {
                     request.complete(false, net.minecraft.network.chat.Component.translatable("mcdr-singleplayer.error.invalid_player_name").getString());
                     return;
                 }
@@ -306,6 +311,7 @@ public final class SingleplayerBridge implements ModInitializer {
                 request.complete(success, success ? "Saved the game" : net.minecraft.network.chat.Component.translatable("mcdr-singleplayer.error.world_save_failed").getString());
                 return;
             }
+            command = McdrClickCommandRewriter.addSlash(command);
             var source = server.createCommandSourceStack().withSource(capture)
                     .withCallback((success, result) -> { capture.success |= success; capture.result += result; });
             server.getCommands().performPrefixedCommand(source, command);

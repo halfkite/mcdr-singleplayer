@@ -57,6 +57,11 @@ class BridgeProxy:
         if not isinstance(config, dict):
             raise ProtocolError('invalid bridge configuration')
         port = config.get('port', 25585)
+        if os.environ.get('MCDR_BRIDGE_PORT') is not None:
+            try:
+                port = int(os.environ['MCDR_BRIDGE_PORT'])
+            except ValueError:
+                raise ProtocolError('invalid bridge port') from None
         token = config.get('token')
         if type(port) is not int or not 1 <= port <= 65535:
             raise ProtocolError('invalid bridge port')
@@ -234,6 +239,11 @@ class BridgeProxy:
         except (OSError, EOFError, ValueError, TypeError) as exc:
             if self.stop.is_set():
                 return 0
+            common = os.environ.get('MCDR_BRIDGE_COMMON')
+            client_id = os.environ.get('MCDR_BRIDGE_CLIENT_ID')
+            if common and client_id:
+                from .installation_progress import InstallationProgress
+                InstallationProgress(common, client_id).report('failed')
             # Errors are deliberately generic: configuration and network data can contain secrets.
             self.error(tr('proxy.session_ended', type(exc).__name__))
             return 1

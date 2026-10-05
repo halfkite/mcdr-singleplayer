@@ -194,15 +194,17 @@ def migrate_profile_data(profile):
         data.rmdir()
 
 
-def migrate_legacy(common):
+def migrate_legacy(common, *, controller_locked=False):
     from .supervisor import lock_common
     common = Path(common).resolve()
     common.mkdir(parents=True, exist_ok=True)
-    lease = lock_common(common)
+    # Automatic installation holds this lease throughout its file/config updates.
+    lease = None if controller_locked else lock_common(common)
     try:
         _migrate_legacy(common)
     finally:
-        lease.close()
+        if lease:
+            lease.close()
 
 
 def _migrate_legacy(common):

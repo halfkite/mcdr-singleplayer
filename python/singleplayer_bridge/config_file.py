@@ -1,5 +1,7 @@
 """Read and write the small, comment-friendly YAML configuration shared by the bridge."""
 import json
+import os
+import tempfile
 from pathlib import Path
 
 
@@ -88,7 +90,7 @@ def write(path, config):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.suffix.lower() == '.json':
-        path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + '\n', encoding='utf8')
+        _atomic_write(path, json.dumps(config, ensure_ascii=False, indent=2) + '\n')
         return
     values = dict(DEFAULTS)
     values.update(config)
@@ -105,4 +107,16 @@ def write(path, config):
         lines.extend((f'# {COMMENTS[key]}', f'{key}: {json.dumps(values.pop(key), ensure_ascii=False)}'))
     for key, value in values.items():
         lines.append(f'{key}: {json.dumps(value, ensure_ascii=False)}')
-    path.write_text('\n'.join(lines) + '\n', encoding='utf8')
+    _atomic_write(path, '\n'.join(lines) + '\n')
+
+
+def _atomic_write(path, contents):
+    # A second game process must never read partially written onboarding settings.
+    descriptor, temporary = tempfile.mkstemp(prefix='.bridge-config-', suffix='.tmp', dir=path.parent)
+    try:
+        with os.fdopen(descriptor, 'w', encoding='utf8') as stream:
+            stream.write(contents)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)

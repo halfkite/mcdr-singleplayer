@@ -47,6 +47,32 @@ class RestoreProgressMonitorTest {
         assertNotNull(cancelled);
         assertFalse(cancelled.blocksWorld());
     }
+    @Test void failedAtomicMoveClearsOnlyItsOwnProvisionalLock() throws Exception {
+        Path path = directory.resolve(".mcdr_restore_progress.json");
+        try (var monitor = new RestoreProgressMonitor(path)) {
+            monitor.session("current-world");
+            Files.writeString(path, status("running", true).toString());
+            assertTrue(RestoreProgressMonitor.blocks("World"));
+            var waiting = status("running", false);
+            waiting.addProperty("stage", "waiting_files");
+            Files.writeString(path, waiting.toString());
+            assertTrue(RestoreProgressMonitor.blocks("World"));
+            Files.writeString(path, status("failed", false).toString());
+            assertFalse(RestoreProgressMonitor.blocks("World"));
+            assertEquals("[]", Files.readString(directory.resolve(".mcdr_restore_locks.json")));
+        }
+    }
+    @Test void failedUnmodifiedRetryDoesNotClearAnOlderRestoreLock() throws Exception {
+        Path path = directory.resolve(".mcdr_restore_progress.json");
+        Files.writeString(directory.resolve(".mcdr_restore_locks.json"), "[\"World\"]");
+        try (var monitor = new RestoreProgressMonitor(path)) {
+            monitor.session("current-world");
+            Files.writeString(path, status("running", true).toString());
+            assertTrue(RestoreProgressMonitor.blocks("World"));
+            Files.writeString(path, status("failed", false).toString());
+            assertTrue(RestoreProgressMonitor.blocks("World"));
+        }
+    }
     @Test void chunkBackupRecoveryAndPlayerStagesKeepWorldLocked() throws Exception {
         Path path = directory.resolve(".mcdr_restore_progress.json");
         try (var monitor = new RestoreProgressMonitor(path)) {

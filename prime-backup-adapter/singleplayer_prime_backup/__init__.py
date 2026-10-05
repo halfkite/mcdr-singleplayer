@@ -5,7 +5,8 @@ import importlib
 import time
 from pathlib import Path
 
-from .guards import check_backup, check_binding, check_unlocked
+from .guards import check_backup, check_binding, check_unlocked, move_world_to_trash
+from singleplayer_bridge.backup_guard import wait_restore_ready
 
 _server = None
 _world_path = ''
@@ -23,7 +24,7 @@ def bridge():
 def preflight(task, restore=False):
     if not _world_path:
         raise RuntimeError(tr('error.no_world_bound_to_the_prime_backup_adapter_run_setup_prime_backup_py'))
-    world = check_binding(_world_path, task.config)
+    world = check_binding(_world_path, task.config, allow_incomplete=restore)
     if restore and task.config.backup.retain_patterns:
         raise RuntimeError(tr('error.this_adapter_requires_empty_retain_patterns_to_keep_restoration_inside_the_bound_world'))
     commands = task.config.server.commands
@@ -180,7 +181,9 @@ def _install():
             def run(action):
                 from singleplayer_bridge.restore_progress import current_restore
                 progress = current_restore.get()
-                if progress is not None:
+                if progress is not None and action_stage == 'restoring':
+                    wait_restore_ready(_world_path, progress=progress)
+                if progress is not None and action_stage != 'restoring':
                     progress.update(action_stage)
                 result = original_run(action)
                 if progress is not None and action_stage == 'restoring':
@@ -193,6 +196,24 @@ def _install():
         wrapper = action_wrapper(original, stage)
         cls.run = wrapper
         _patches.append((cls, wrapper, original))
+    # PB's shutil.move fallback can copy then partially delete a locked world on
+    # Windows. Its temporary trash directory is on the target volume, so require
+    # an atomic rename for this adapter's bound world instead of that fallback.
+    module = importlib.import_module('prime_backup.action.export_backup_action_directory')
+    trash = getattr(module, '_TrashBin', None)
+    if trash is not None:
+        original_add = trash.add
+        def add(bin, source, relative):
+            from singleplayer_bridge.restore_progress import current_restore
+            progress = current_restore.get()
+            if progress is None or Path(source).resolve() != Path(_world_path).resolve():
+                return original_add(bin, source, relative)
+            target = bin.trash_bin_path / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            move_world_to_trash(source, target, progress=progress)
+            bin.trashes.append((target, source))
+        trash.add = add
+        _patches.append((trash, add, original_add))
     _prime_instance = instance
     _server.logger.info('Prime Backup 1.13.1 singleplayer adapter ready (one bound world, confirmed saves and shutdown)')
 
@@ -207,6 +228,8 @@ def on_load(server, previous):
 
 def on_unload(server):
     for cls, wrapper, original in reversed(_patches):
-        if cls.run is wrapper:
+        if getattr(cls, 'add', None) is wrapper:
+            cls.add = original
+        elif getattr(cls, 'run', None) is wrapper:
             cls.run = original
     _patches.clear()

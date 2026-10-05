@@ -11,6 +11,7 @@ import net.minecraft.network.chat.Component;
 /** Actual native language reload plus Python chat in independently opened test saves. */
 public final class LanguageGameTest implements FabricClientGameTest {
     @Override public void runTest(ClientGameTestContext context) {
+        if (MultiClientGameTest.selected()) return;
         if (System.getenv("MCDR_BRIDGE_TEST_AUTO_COMMON") == null) return;
         var messages = new CopyOnWriteArrayList<String>();
         ClientReceiveMessageEvents.GAME.register((text, overlay) -> messages.add(text.getString()));

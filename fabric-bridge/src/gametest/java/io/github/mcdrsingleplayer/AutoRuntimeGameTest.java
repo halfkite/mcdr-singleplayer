@@ -18,6 +18,7 @@ import net.minecraft.world.level.block.Blocks;
 /** Real automatic startup, slash completion, recommendation, PB restore, profile reopen/switch. */
 public final class AutoRuntimeGameTest implements FabricClientGameTest {
     @Override public void runTest(ClientGameTestContext context) {
+        if (MultiClientGameTest.selected()) return;
         String commonPath = System.getenv("MCDR_BRIDGE_TEST_AUTO_COMMON");
         if (commonPath == null) return;
         Path game = FabricLoader.getInstance().getGameDir().toAbsolutePath();
@@ -55,7 +56,7 @@ public final class AutoRuntimeGameTest implements FabricClientGameTest {
                 from mcdreforged.api.command import Literal, QuotableText
                 import os, time
                 from pathlib import Path
-                PLUGIN_METADATA = {'id': 'test_command_probe', 'version': '1.0.0', 'dependencies': {'prime_backup': '==1.13.1', 'singleplayer_prime_backup': '==0.4.2'}}
+                PLUGIN_METADATA = {'id': 'test_command_probe', 'version': '1.0.0', 'dependencies': {'prime_backup': '==1.13.1', 'singleplayer_prime_backup': '==0.5.1'}}
                 _export = None
                 ExportBackupToDirectoryAction = None
                 def on_load(server, previous):
@@ -86,6 +87,7 @@ public final class AutoRuntimeGameTest implements FabricClientGameTest {
         });
         context.waitFor(client -> languageReload.isDone(), 2400);
         var world = context.worldBuilder().create();
+        AutoRuntime guestRuntime = null;
         try {
             Path save = world.getWorldSave().getSaveDirectory().toAbsolutePath();
             Path profile = common.resolve("plugindata").resolve(save.getFileName());
@@ -104,6 +106,17 @@ public final class AutoRuntimeGameTest implements FabricClientGameTest {
                 context.runOnClient(client -> client.player.connection.sendCommand("!!MCDR plugin load test_command_probe.py"));
             }
             context.waitFor(client -> ClientCommands.getActiveDispatcher().getRoot().getChild("!!extra") != null, 1800);
+            BridgeConfig guestConfig = BridgeConfig.loadForGame(game);
+            guestConfig.pythonExecutable = python;
+            guestRuntime = new AutoRuntime(guestConfig, BridgeConfig.pathForGame(game), game);
+            guestRuntime.start();
+            AutoRuntime guestObserver = guestRuntime;
+            context.waitFor(client -> guestObserver.installProgress(false).stage().equals("waiting_instance"), 2400);
+            context.runOnClient(client -> client.player.connection.sendCommand("!!extra_alias nested leaf alpha"));
+            context.waitFor(client -> messages.contains("EXTRA_OK alpha"), 800);
+            BridgeGameTest.check(PrimeBackupGameTest.count(controllerLog, "MCDR profile started:") == profilesBefore + 1,
+                    "Second client startup replaced the live host profile");
+            guestRuntime.closing();
             BridgeGameTest.check(Files.readString(common.resolve("permission.yml")).contains("- " + context.computeOnClient(client -> client.player.getPlainTextName())), "Main player not automatically granted owner");
             BridgeGameTest.check(Files.readString(common.resolve("config.yml")).contains("language: zh_cn"), "MCDR language did not follow client");
             var initial = config(profile);
@@ -218,6 +231,7 @@ public final class AutoRuntimeGameTest implements FabricClientGameTest {
             context.takeScreenshot("automatic-profile-world-switch");
         } catch (IOException e) { throw new AssertionError(e); }
         finally {
+            if (guestRuntime != null) guestRuntime.closing();
             bridge.setTestCloseDispatcher(null);
             var resetLanguage = context.computeOnClient(client -> {
                 client.getLanguageManager().setSelected(oldLanguage);

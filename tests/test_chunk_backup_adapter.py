@@ -70,18 +70,19 @@ def test_abort_never_claims_completion_or_stops_world(bound):
     assert bound.state['session'] == 's' and not bound.calls
 
 
-def test_radius_backup_reads_one_atomic_player_snapshot(bound, monkeypatch):
+@pytest.mark.parametrize('name', ['Player0', '1', 'ab'])
+def test_radius_backup_reads_one_atomic_player_snapshot(bound, monkeypatch, name):
     # No NBT, locale or display-name parsing; negative/scientific coordinates remain numeric.
     point_module = SimpleNamespace(Point3D=lambda x, y, z: SimpleNamespace(x=x, y=y, z=z))
     monkeypatch.setitem(sys.modules, 'chunk_backup.types.point', point_module)
-    expected = dict(player='Player0', x=-1.25e3, y=-59.5, z=2.01, dimension='minecraft:the_nether')
+    expected = dict(player=name, x=-1.25e3, y=-59.5, z=2.01, dimension='minecraft:the_nether')
     def execute(server, command):
         bound.calls.append(command)
         return {'text': json.dumps(expected)}
     monkeypatch.setattr(adapter.bridge(), 'execute_checked', execute)
     result = adapter.position_wrapper(lambda *args: pytest.fail('Legacy output parser was used'))(
-        SimpleNamespace(config=bound.config), 'Player0')
-    assert bound.calls == ['__bridge_player_data__ Player0']
+        SimpleNamespace(config=bound.config), name)
+    assert bound.calls == ['__bridge_player_data__ ' + name]
     assert result['dimension'] == 'minecraft:the_nether' and result['position'].x == -1250
 
 
