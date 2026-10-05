@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import io
 import json
+import re
 import struct
 import tomllib
 from pathlib import Path
@@ -24,10 +25,15 @@ def verify_checksum(path, release_assets=None):
     assert hashlib.sha256(path.read_bytes()).hexdigest() == expected_hash, 'Artifact checksum mismatch'
 
 
-def verify(loader, family, release_assets=None):
+def verify(loader, family, release_assets=None, timestamp=None):
     matrix = json.loads((ROOT / 'compat/versions.json').read_text(encoding='utf8'))
     rows = [r for r in matrix['versions'] if r['family'] == family]
-    path = ROOT / 'dist' / f"mcdr-singleplayer-{matrix['modVersion']}+{loader}+mc{family}.jar"
+    version = matrix['modVersion']
+    if timestamp:
+        if not re.fullmatch(r'\d{8}-\d{4}', timestamp):
+            raise ValueError('Development timestamp must use UTC YYYYMMDD-HHMM format')
+        version += '-dev.' + timestamp.replace('-', '.')
+    path = ROOT / 'dist' / f"mcdr-singleplayer-{version}+{loader}+mc{family}.jar"
     with ZipFile(path) as jar:
         names = jar.namelist()
         assert len(names) == len(set(names)), 'Duplicate ZIP entries'
@@ -56,12 +62,12 @@ def verify(loader, family, release_assets=None):
         if loader == 'fabric':
             metadata = json.loads(jar.read('fabric.mod.json'))
             assert set(metadata['depends']['minecraft']) == set(variants)
-            assert metadata['version'] == matrix['modVersion']
+            assert metadata['version'] == version
             assert metadata['environment'] == 'client'
             assert metadata['depends']['fabricloader'] == '>=' + matrix['fabricLoaderMinimum']
         else:
             metadata = tomllib.loads(jar.read('META-INF/neoforge.mods.toml').decode())
-            assert metadata['mods'][0]['version'] == matrix['modVersion']
+            assert metadata['mods'][0]['version'] == version
             loader_dep = next(d for d in metadata['dependencies']['mcdr_singleplayer'] if d['modId'] == 'neoforge')
             assert loader_dep['versionRange'] == ('[21.0,)' if family == '1.21.x' else '[26.1,)')
             dep = next(d for d in metadata['dependencies']['mcdr_singleplayer'] if d['modId'] == 'minecraft')
@@ -76,13 +82,14 @@ def main():
     parser.add_argument('--loader', choices=['fabric', 'neoforge'])
     parser.add_argument('--family', choices=['1.21.x', '26.x'])
     parser.add_argument('--release-assets', type=Path)
+    parser.add_argument('--timestamp', help='Verify a development artifact with UTC YYYYMMDD-HHMM version suffix')
     parser.add_argument('--source-root', type=Path)
     args = parser.parse_args()
     if args.source_root:
         ROOT = args.source_root.resolve()
     for loader in ([args.loader] if args.loader else ['fabric', 'neoforge']):
         for family in ([args.family] if args.family else ['1.21.x', '26.x']):
-            verify(loader, family, args.release_assets)
+            verify(loader, family, args.release_assets, args.timestamp)
 
 
 if __name__ == '__main__':

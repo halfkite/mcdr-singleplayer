@@ -48,6 +48,7 @@ If MCDR is still being prepared when you enter a world, a progress screen identi
 - Register loaded MCDR plugin root commands, aliases, subcommands, arguments, and suggestions as client-side `/!!` commands; update them when plugins are loaded, unloaded, or reloaded
 - Isolate plugin configuration, plugin data, and backups by save-folder name, and start the matching MCDR environment when switching saves
 - Adapt Prime Backup and Chunk Backup for singleplayer; show restore progress and prevent opening the target save until restoration is complete
+- If a Prime Backup restore fails or leaves an entry lock, choose a backup of that world from the main menu and retry; the previous world is preserved in `runtime/recovery-history/`
 - Check Windows file locks before restoration, report the blocked file and stop if it remains locked; close configuration readers left open by Syncmatica 0.3.20
 - Adapt Conflux Map 0.1.6 by keeping native libraries outside saves in separate caches for each game process, preventing loaded DLLs from blocking restores when multiple clients run
 - Support Simplified Chinese, Traditional Chinese, and English, following the client language

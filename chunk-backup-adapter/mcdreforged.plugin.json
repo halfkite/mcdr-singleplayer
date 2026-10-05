@@ -1,6 +1,6 @@
 {
   "id": "singleplayer_chunk_backup",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "name": "Singleplayer Chunk Backup Adapter",
   "description": "Safe world shutdown and restore progress for Chunk Backup in singleplayer.",
   "authors": ["MCDR Singleplayer contributors"],

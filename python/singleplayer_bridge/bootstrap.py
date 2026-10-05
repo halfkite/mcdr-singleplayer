@@ -29,7 +29,7 @@ def download_checked(urls, destination, digest, opener=urllib.request.urlopen):
     for url in urls:
         try:
             started = time.monotonic()
-            request = urllib.request.Request(url, headers={'User-Agent': 'MCDR-Singleplayer-Bridge/0.5.1'})
+            request = urllib.request.Request(url, headers={'User-Agent': 'MCDR-Singleplayer-Bridge/0.5.2'})
             with opener(request, timeout=15) as response, temporary.open('wb') as output:
                 total = 0
                 while chunk := response.read(65536):
@@ -134,7 +134,7 @@ def install(common, resources, update=False, progress=None, controller_locked=Fa
     progress('plugins')
     # Backup plugins are opt-in. Keep bundled adapters outside the live plugin directory
     # until their upstream plugin is present; first-run chat provides install buttons.
-    from .onboarding import archives
+    from .plugin_archives import archives
     bundled_plugins = [('bridge-plugin', 'singleplayer_bridge.mcdr')]
     adapter_store = runtime_root / 'backup-adapters'
     adapter_store.mkdir(exist_ok=True)

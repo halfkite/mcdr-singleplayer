@@ -124,6 +124,9 @@ public final class RestoreProgressMonitor implements AutoCloseable {
                 operationLocks.remove(value.world());
             }
             if (changed) saveLocks();
+            Progress displayed = current;
+            if (displayed != null && displayed.status().equals("failed")
+                    && lockedWorlds.contains(displayed.world()) && !displayed.world().equals(value.world())) return;
             if (session == null && !value.blocksWorld() && !previouslyLocked) return;
             if (session != null && !session.equals(value.session()) && !previouslyLocked) return;
             current = value;

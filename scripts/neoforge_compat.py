@@ -38,6 +38,9 @@ import org.slf4j.Logger;''')
     elif name == 'ConfluxNativeCacheMixin.java':
         text = text.replace('FabricLoader.getInstance().getGameDir()',
                             'net.neoforged.fml.loading.FMLPaths.GAMEDIR.get()')
+    elif name == 'RestoreRecoveryClient.java':
+        text = text.replace('FabricLoader.getInstance().getGameDir()',
+                            'net.neoforged.fml.loading.FMLPaths.GAMEDIR.get()')
     elif name == 'ClientCommandTree.java':
         text = text.replace('import com.google.gson.JsonArray;', '''import net.minecraft.commands.Commands;
 import net.minecraft.commands.CommandSourceStack;

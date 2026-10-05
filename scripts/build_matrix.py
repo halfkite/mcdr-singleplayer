@@ -1,8 +1,10 @@
 """Compile explicit game adapters and merge them into one installable JAR per family/loader."""
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -11,6 +13,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 ROOT = Path(__file__).resolve().parents[1]
 MATRIX = json.loads((ROOT / 'compat/versions.json').read_text(encoding='utf8'))
 VERSION = MATRIX['modVersion']
+BUILD_VERSION = VERSION
 ARCHIVER = Path(os.environ.get('MCDR_BUILD_ARCHIVER', Path.home() / '.codex/skills/build-game-mods/scripts/archive_mod_build.py'))
 if not ARCHIVER.is_file():
     ARCHIVER = ROOT / 'scripts/archive_build.py'
@@ -26,7 +29,7 @@ def archive(artifact, label, command):
 
 
 def variant_artifact(loader, game):
-    artifact = ROOT / 'build/matrix' / loader / game / 'build/libs' / f'mcdr-singleplayer-{VERSION}+{loader}+mc{game}.jar'
+    artifact = ROOT / 'build/matrix' / loader / game / 'build/libs' / f'mcdr-singleplayer-{BUILD_VERSION}+{loader}+mc{game}.jar'
     if not artifact.is_file():
         raise RuntimeError('Missing compiled adapter for current version: ' + str(artifact))
     return artifact
@@ -44,7 +47,7 @@ def compile_variant(loader, row):
 
 
 def merge(loader, family, rows):
-    output = ROOT / 'dist' / f'mcdr-singleplayer-{VERSION}+{loader}+mc{family}.jar'
+    output = ROOT / 'dist' / f'mcdr-singleplayer-{BUILD_VERSION}+{loader}+mc{family}.jar'
     output.parent.mkdir(parents=True, exist_ok=True)
     contents = {}
     for row in rows:
@@ -85,12 +88,25 @@ def merge(loader, family, rows):
 
 
 def main():
+    global BUILD_VERSION
     parser = argparse.ArgumentParser()
     parser.add_argument('--loader', choices=['fabric', 'neoforge'], required=True)
     parser.add_argument('--family', choices=['1.21.x', '26.x'])
     parser.add_argument('--game')
     parser.add_argument('--merge-only', action='store_true')
+    parser.add_argument('--release', action='store_true', help='Build the stable version for GitHub/CurseForge releases')
+    parser.add_argument('--timestamp', help='Shared UTC development timestamp in YYYYMMDD-HHMM format')
     args = parser.parse_args()
+    if args.release and args.timestamp:
+        parser.error('--timestamp cannot be used with --release')
+    if args.release:
+        BUILD_VERSION = VERSION
+    else:
+        timestamp = args.timestamp or datetime.now(timezone.utc).strftime('%Y%m%d-%H%M')
+        if not re.fullmatch(r'\d{8}-\d{4}', timestamp):
+            parser.error('--timestamp must use UTC YYYYMMDD-HHMM format')
+        BUILD_VERSION = VERSION + '-dev.' + timestamp.replace('-', '.')
+    os.environ['MCDR_BUILD_VERSION'] = BUILD_VERSION
     if not args.family and not args.game:
         parser.error('Specify --family or --game')
     rows = [r for r in MATRIX['versions'] if (not args.family or r['family'] == args.family) and (not args.game or r['minecraft'] == args.game)]

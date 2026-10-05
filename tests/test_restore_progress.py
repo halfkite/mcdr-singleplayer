@@ -62,12 +62,14 @@ def test_terminal_progress_retries_transient_windows_read_lock(tmp_path, monkeyp
 
 
 def test_real_adapter_hooks_publish_action_stages_and_failure(monkeypatch, tmp_path):
+    import errno
     import sys
     import singleplayer_prime_backup as adapter
     path = tmp_path / '.mcdr_restore_progress.json'
     world = tmp_path / 'world'
     world.mkdir()
     stages = []
+    cleanup_attempts = []
     fail = [False]
     class Create:
         def run(self):
@@ -78,7 +80,14 @@ def test_real_adapter_hooks_publish_action_stages_and_failure(monkeypatch, tmp_p
             stages.append(json.loads(path.read_text())['stage'])
             if fail[0]:
                 raise RuntimeError('verification failure')
+            Temp().erase()
             return []
+    class Temp:
+        def erase(self):
+            cleanup_attempts.append(1)
+            if len(cleanup_attempts) == 1:
+                raise OSError(errno.ENOTEMPTY, 'Directory not empty')
+    original_temp_erase = Temp.erase
     class Restore:
         backup_id = 1
         fail_soft = False
@@ -97,7 +106,8 @@ def test_real_adapter_hooks_publish_action_stages_and_failure(monkeypatch, tmp_p
         'prime_backup.mcdr.task.backup.create_backup_task': SimpleNamespace(CreateBackupTask=Backup),
         'prime_backup.mcdr.task.backup.restore_backup_task': SimpleNamespace(RestoreBackupTask=Restore),
         'prime_backup.action.create_backup_action': SimpleNamespace(CreateBackupAction=Create),
-        'prime_backup.action.export_backup_action_directory': SimpleNamespace(ExportBackupToDirectoryAction=Export, _TrashBin=Trash),
+        'prime_backup.action.export_backup_action_directory': SimpleNamespace(
+            ExportBackupToDirectoryAction=Export, _TrashBin=Trash, _ExportTempDirectory=Temp),
     }
     instance = object()
     server = SimpleNamespace(get_plugin_instance=lambda name: instance,
@@ -116,6 +126,7 @@ def test_real_adapter_hooks_publish_action_stages_and_failure(monkeypatch, tmp_p
     adapter._install()
     Restore().run()
     assert stages == ['safety_backup', 'restoring']
+    assert len(cleanup_attempts) == 2
     assert json.loads(path.read_text())['status'] == 'completed' and current_restore.get() is None
     fail[0] = True
     import pytest
@@ -140,3 +151,4 @@ def test_real_adapter_hooks_publish_action_stages_and_failure(monkeypatch, tmp_p
     finally:
         current_restore.reset(token)
     adapter.on_unload(server)
+    assert Temp.erase is original_temp_erase

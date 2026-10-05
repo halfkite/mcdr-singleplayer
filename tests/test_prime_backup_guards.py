@@ -1,4 +1,6 @@
+import errno
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -7,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from singleplayer_prime_backup.guards import check_backup, check_binding, check_unlocked
+from singleplayer_prime_backup.guards import check_backup, check_binding, check_unlocked, retry_temp_cleanup
 
 
 @pytest.fixture
@@ -81,3 +83,33 @@ def test_restore_rejects_a_partial_backup_without_level_dat(world):
     backup = SimpleNamespace(targets=[world.name], files=[SimpleNamespace(path=f'{world.name}/syncmatica/config.json', mode=stat.S_IFREG)])
     with pytest.raises(RuntimeError, match='level.dat'):
         check_backup(world, backup)
+
+
+def test_temp_cleanup_retries_directory_not_empty(tmp_path):
+    temp = tmp_path / 'export_temp'
+    graveyard = temp / 'trash_bin/world/config/carpet-org-addition/player_data/graveyard'
+    graveyard.mkdir(parents=True)
+    (graveyard / 'old.json').write_text('old')
+    attempts = []
+
+    def erase():
+        attempts.append(1)
+        if len(attempts) == 1:
+            (graveyard / 'late.json').write_text('late')
+            raise OSError(errno.ENOTEMPTY, 'Directory not empty', str(graveyard))
+        shutil.rmtree(temp)
+
+    retry_temp_cleanup(erase, timeout=1)
+    assert len(attempts) == 2 and not temp.exists()
+
+
+def test_temp_cleanup_preserves_persistent_or_unrelated_errors():
+    for error, expected_calls in [(OSError(errno.ENOTEMPTY, 'Directory not empty'), 1),
+                                  (OSError(errno.EIO, 'I/O error'), 1)]:
+        calls = []
+        def erase():
+            calls.append(1)
+            raise error
+        with pytest.raises(OSError) as raised:
+            retry_temp_cleanup(erase, timeout=0)
+        assert raised.value is error and len(calls) == expected_calls

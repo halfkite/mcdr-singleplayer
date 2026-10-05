@@ -128,7 +128,7 @@ def on_server_stop(server, code):
                 assert sum(item.get('join') == 'Steve' for item in entries) == 1
                 process.stdin.write('!!MCDR permission set Steve owner\n!!MCDR plugin reload singleplayer_bridge\n')
                 process.stdin.flush()
-                wait_until(lambda: 'Plugin singleplayer_bridge@0.5.1 reloaded' in log_path.read_text(encoding='utf8'))
+                wait_until(lambda: 'Plugin singleplayer_bridge@0.5.2 reloaded' in log_path.read_text(encoding='utf8'))
                 connection.sendall(encode_frame(dict(type='chat', session='world-1', player='Steve', text='!!spbridge status')))
                 status = receive()
                 assert '26.3' in status['command'] and '世界' in status['command']

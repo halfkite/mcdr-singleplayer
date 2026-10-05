@@ -5,7 +5,7 @@ import importlib
 import time
 from pathlib import Path
 
-from .guards import check_backup, check_binding, check_unlocked, move_world_to_trash
+from .guards import check_backup, check_binding, check_unlocked, move_world_to_trash, retry_temp_cleanup
 from singleplayer_bridge.backup_guard import wait_restore_ready
 
 _server = None
@@ -214,6 +214,19 @@ def _install():
             bin.trashes.append((target, source))
         trash.add = add
         _patches.append((trash, add, original_add))
+    temp_dir = getattr(module, '_ExportTempDirectory', None)
+    if temp_dir is not None:
+        original_erase = temp_dir.erase
+        @functools.wraps(original_erase)
+        def erase(directory):
+            from singleplayer_bridge.restore_progress import current_restore
+            progress = current_restore.get()
+            if progress is None:
+                return original_erase(directory)
+            return retry_temp_cleanup(lambda: original_erase(directory),
+                on_retry=lambda exc: progress.update('restoring', detail=str(exc)))
+        temp_dir.erase = erase
+        _patches.append((temp_dir, erase, original_erase))
     _prime_instance = instance
     _server.logger.info('Prime Backup 1.13.1 singleplayer adapter ready (one bound world, confirmed saves and shutdown)')
 
@@ -230,6 +243,8 @@ def on_unload(server):
     for cls, wrapper, original in reversed(_patches):
         if getattr(cls, 'add', None) is wrapper:
             cls.add = original
+        elif getattr(cls, 'erase', None) is wrapper:
+            cls.erase = original
         elif getattr(cls, 'run', None) is wrapper:
             cls.run = original
     _patches.clear()

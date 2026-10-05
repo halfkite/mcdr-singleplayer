@@ -20,14 +20,21 @@ final class RestoreTitleOverlay {
             background.init(width, height);
             int top = Math.max(24, height / 2 - 65);
             var states = new IdentityHashMap<AbstractWidget, boolean[]>();
+            var retry = Button.builder(Component.translatable("mcdr-singleplayer.restore.retry.button"), button -> {
+                var value = monitor.visible();
+                if (value != null && value.status().equals("failed"))
+                    client.gui.setScreen(new RestoreBackupSelectionScreen(value.world()));
+            }).bounds(width / 2 - 100, top + 122, 200, 20).build();
+            retry.visible = false;
+            Screens.getWidgets(screen).add(retry);
             var dismiss = Button.builder(Component.literal(""), button -> monitor.dismiss())
-                .bounds(width / 2 - 100, top + 122, 200, 20).build();
+                .bounds(width / 2 - 100, top + 146, 200, 20).build();
             dismiss.visible = false;
             Screens.getWidgets(screen).add(dismiss);
             ScreenEvents.beforeExtract(screen).register((ignored, graphics, mouseX, mouseY, ticks) -> {
                 var value = monitor.visible();
                 for (var widget : Screens.getWidgets(screen)) {
-                    if (widget == dismiss) continue;
+                    if (widget == dismiss || widget == retry) continue;
                     if (value != null) {
                         states.putIfAbsent(widget, new boolean[]{widget.visible, widget.active});
                         widget.visible = false;
@@ -40,6 +47,8 @@ final class RestoreTitleOverlay {
                 }
                 dismiss.visible = value != null;
                 dismiss.active = value != null && !value.running();
+                retry.visible = value != null && value.status().equals("failed");
+                retry.active = retry.visible;
             });
             ScreenEvents.afterExtract(screen).register((ignored, graphics, mouseX, mouseY, ticks) -> {
                 var value = monitor.visible();
@@ -83,6 +92,7 @@ final class RestoreTitleOverlay {
                 }
                 dismiss.setMessage(Component.translatable(value.running() ? "mcdr-singleplayer.restore.button.running" : "mcdr-singleplayer.restore.button.menu"));
                 graphics.nextStratum();
+                if (retry.visible) retry.extractRenderState(graphics, mouseX, mouseY, ticks);
                 dismiss.extractRenderState(graphics, mouseX, mouseY, ticks);
             });
         });

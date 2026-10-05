@@ -127,4 +127,18 @@ class RestoreProgressMonitorTest {
             assertFalse(RestoreProgressMonitor.blocks("World"));
         }
     }
+
+    @Test void lockedWorldFailureStaysVisibleWhenAnotherWorldWritesProgress() throws Exception {
+        Path path = directory.resolve(".mcdr_restore_progress.json");
+        try (var monitor = new RestoreProgressMonitor(path)) {
+            monitor.session("current-world");
+            Files.writeString(path, status("failed", true).toString());
+            assertTrue(RestoreProgressMonitor.blocks("World"));
+            var other = status("completed", true);
+            other.addProperty("world_name", "Other");
+            Files.writeString(path, other.toString());
+            assertTrue(RestoreProgressMonitor.blocks("World"));
+            assertEquals("World", monitor.visible().world());
+        }
+    }
 }

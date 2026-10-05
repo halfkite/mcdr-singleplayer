@@ -1,5 +1,6 @@
 """Filesystem bounds and the same advisory session lock used by Minecraft's FileChannel."""
 from singleplayer_bridge.i18n import tr
+import errno
 import stat
 import os
 import time
@@ -47,6 +48,26 @@ def move_world_to_trash(world, target, progress=None, timeout=10):
             if time.monotonic() >= deadline:
                 raise RuntimeError(detail) from exc
             time.sleep(0.2)
+
+
+def retry_temp_cleanup(erase, timeout=10, on_retry=None):
+    """Retry short Windows races while PB removes its old-world trash bin.
+
+    Never treat a persistent cleanup error as a completed restore: PB still
+    needs to return normally before the adapter can unlock the world.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            return erase()
+        except OSError as exc:
+            retryable = (getattr(exc, 'winerror', None) in (5, 32, 33, 145)
+                         or exc.errno in (errno.EBUSY, errno.ENOTEMPTY))
+            if not retryable or time.monotonic() >= deadline:
+                raise
+            if on_retry is not None:
+                on_retry(exc)
+            time.sleep(min(0.2, max(0, deadline - time.monotonic())))
 
 
 def check_backup(world, backup):

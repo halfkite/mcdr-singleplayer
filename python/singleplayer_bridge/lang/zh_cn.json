@@ -206,5 +206,13 @@
   "mcdr-singleplayer.error.restore_file_still_in_use": "存档文件仍被占用或无法替换：%s，请关闭占用程序（可能需完全退出 Minecraft）后重试回档",
   "mcdr-singleplayer.error.restore_directory_still_in_use": "无法移动存档文件夹 %s，请关闭查看该存档及其子文件夹的资源管理器窗口和其他占用程序，然后重试回档",
   "mcdr-singleplayer.error.restore_native_library_in_use": "原生库仍被占用：%s，请完全退出使用这个游戏目录的 Minecraft 客户端后重试，返回主菜单可能不会卸载 DLL",
-  "mcdr-singleplayer.error.restore_backup_has_no_level_dat": "该回档备份不包含有效的 level.dat 文件"
+  "mcdr-singleplayer.error.restore_backup_has_no_level_dat": "该回档备份不包含有效的 level.dat 文件",
+  "mcdr-singleplayer.restore.retry.button": "重新回档",
+  "mcdr-singleplayer.restore.retry.title": "选择回档备份",
+  "mcdr-singleplayer.restore.retry.back": "返回主菜单",
+  "mcdr-singleplayer.restore.retry.loading": "正在读取 Prime Backup 备份",
+  "mcdr-singleplayer.restore.retry.empty": "当前存档没有可用的 Prime Backup 备份",
+  "mcdr-singleplayer.restore.retry.confirm": "确认回档到备份 #%s",
+  "mcdr-singleplayer.restore.retry.warning": "当前存档会完整保留在 recovery-history",
+  "mcdr-singleplayer.restore.retry.safety_backup": "回档前保护备份 #%s"
 }

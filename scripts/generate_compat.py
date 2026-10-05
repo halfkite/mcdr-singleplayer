@@ -14,7 +14,7 @@ BASE = 'io.github.mcdrsingleplayer'
 
 def fabric_metadata(row):
     metadata = json.loads((ROOT / 'fabric-bridge/src/main/resources/fabric.mod.json').read_text())
-    metadata['version'] = MATRIX['modVersion']
+    metadata['version'] = os.environ.get('MCDR_BUILD_VERSION', MATRIX['modVersion'])
     metadata['entrypoints'] = {'main': [BASE + '.bootstrap.FabricEntry']}
     metadata['mixins'] = ['mcdr-family.mixins.json']
     metadata['depends'] = {'fabricloader': '>=' + MATRIX['fabricLoaderMinimum'], 'minecraft': row['minecraft'],
@@ -34,7 +34,7 @@ license="LGPL-3.0-only"
 issueTrackerURL="https://github.com/halfkite/mcdr-singleplayer/issues"
 [[mods]]
 modId="mcdr_singleplayer"
-version="{MATRIX['modVersion']}"
+version="{os.environ.get('MCDR_BUILD_VERSION', MATRIX['modVersion'])}"
 displayName="mcdr-singleplayer"
 displayURL="https://github.com/halfkite/mcdr-singleplayer"
 {'iconFile' if row['java'] == 25 else 'logoFile'}="assets/mcdr-singleplayer/icon.png"
@@ -70,6 +70,7 @@ def legacy_overlay(text, game):
     text = text.replace('screen.getFont()', 'client.font')
     text = text.replace('graphics.centeredText', 'graphics.drawCenteredString')
     text = text.replace('dismiss.extractRenderState', 'dismiss.render')
+    text = text.replace('retry.extractRenderState', 'retry.render')
     return text
 
 
@@ -91,6 +92,9 @@ def adapt_java(text, name, row, loader):
         text = text.replace('client.gui.setScreen(', 'client.setScreen(')
         text = text.replace('getInstance().gui.setScreen(', 'getInstance().setScreen(')
         if name in ('RestoreTitleScreenMixin.java', 'PythonSetupScreen.java', 'McdrInstallNoticeScreen.java'):
+            text = text.replace('GuiGraphicsExtractor', 'GuiGraphics').replace('extractRenderState', 'render')
+            text = text.replace('graphics.centeredText', 'graphics.drawCenteredString')
+        if name == 'RestoreBackupSelectionScreen.java':
             text = text.replace('GuiGraphicsExtractor', 'GuiGraphics').replace('extractRenderState', 'render')
             text = text.replace('graphics.centeredText', 'graphics.drawCenteredString')
         if name == 'PythonSetupScreen.java':
@@ -195,7 +199,7 @@ rootProject.name = 'mcdr-singleplayer'
         properties += 'org.gradle.java.installations.paths=' + os.environ['MCDR_JAVA_INSTALLATIONS'].replace('\\', '/') + '\n'
     write(project / 'gradle.properties', properties)
     gradle = (ROOT / 'compat' / (loader + '.gradle')).read_text(encoding='utf8')
-    values = {'GAME': game, 'VERSION': MATRIX['modVersion'], 'JAVA': row['java'], 'ROOT': ROOT.as_posix(),
+    values = {'GAME': game, 'VERSION': os.environ.get('MCDR_BUILD_VERSION', MATRIX['modVersion']), 'JAVA': row['java'], 'ROOT': ROOT.as_posix(),
               'FABRIC_API': row['fabricApi'], 'LOADER': MATRIX['fabricLoader'], 'NEOFORGE': row['neoforge'],
               'LOOM_PLUGIN': 'net.fabricmc.fabric-loom' if row['java'] == 25 else 'fabric-loom',
               'MOD_DEPENDENCY': 'implementation' if row['java'] == 25 else 'modImplementation',

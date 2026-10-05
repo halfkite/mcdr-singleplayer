@@ -7,7 +7,7 @@ from .profiles import read_json, write_json
 
 
 def installed(common):
-    from .onboarding import archives
+    from .plugin_archives import archives
     if not (Path(common) / 'plugins').is_dir():
         return False
     return any(version == '2.0.3' for _, version in archives(common, 'chunk_backup'))

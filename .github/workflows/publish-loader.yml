@@ -60,7 +60,7 @@ jobs:
           MOD_FAMILY: ${{ matrix.family }}
         run: |
           chmod +x fabric-bridge/gradlew
-          python scripts/build_matrix.py --loader "$MOD_LOADER" --family "$MOD_FAMILY"
+          python scripts/build_matrix.py --loader "$MOD_LOADER" --family "$MOD_FAMILY" --release
           python scripts/verify_artifacts.py --loader "$MOD_LOADER" --family "$MOD_FAMILY"
       - uses: actions/upload-artifact@v4
         with:

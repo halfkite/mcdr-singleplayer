@@ -12,7 +12,7 @@ try {
     $taskVersion = (Get-Content -LiteralPath 'python/mcdreforged.plugin.json' -Raw | ConvertFrom-Json).version
     & $PythonPath -m pytest -q
     if ($LASTEXITCODE -ne 0) { throw 'Python tests failed' }
-    & (Join-Path $taskRoot 'fabric-bridge/gradlew.bat') -p fabric-bridge build --console=plain
+    & (Join-Path $taskRoot 'fabric-bridge/gradlew.bat') -p fabric-bridge build -PreleaseBuild=true --console=plain
     if ($LASTEXITCODE -ne 0) { throw 'Fabric 26.3 build failed' }
     # Archive the installable jar immediately after every successful actual mod build.
     & $PythonPath $ArchiveScript --artifact "fabric-bridge/build/libs/mcdr-singleplayer-$taskVersion.jar" --output-root 'mod-builds' --mod-name 'mcdr-singleplayer' --game-version '26.3 Fabric' --build-command 'fabric-bridge/gradlew.bat -p fabric-bridge build --console=plain'

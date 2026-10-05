@@ -32,8 +32,16 @@ jobs:
           python -m pytest -q
           chmod +x fabric-bridge/gradlew
           fabric-bridge/gradlew -p fabric-bridge test --console=plain
-  build:
+  development_timestamp:
     needs: tests
+    runs-on: ubuntu-latest
+    outputs:
+      timestamp: ${{ steps.timestamp.outputs.value }}
+    steps:
+      - id: timestamp
+        run: echo "value=$(date -u +'%Y%m%d-%H%M')" >> "$GITHUB_OUTPUT"
+  build:
+    needs: [tests, development_timestamp]
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -61,10 +69,11 @@ jobs:
         env:
           MOD_LOADER: ${{ matrix.loader }}
           MOD_FAMILY: ${{ matrix.family }}
+          MCDR_BUILD_TIMESTAMP: ${{ needs.development_timestamp.outputs.timestamp }}
         run: |
           chmod +x fabric-bridge/gradlew
-          python scripts/build_matrix.py --loader "$MOD_LOADER" --family "$MOD_FAMILY"
-          python scripts/verify_artifacts.py --loader "$MOD_LOADER" --family "$MOD_FAMILY"
+          python scripts/build_matrix.py --loader "$MOD_LOADER" --family "$MOD_FAMILY" --timestamp "$MCDR_BUILD_TIMESTAMP"
+          python scripts/verify_artifacts.py --loader "$MOD_LOADER" --family "$MOD_FAMILY" --timestamp "$MCDR_BUILD_TIMESTAMP"
       - uses: actions/upload-artifact@v4
         with:
           name: mcdr-singleplayer-${{ matrix.loader }}-${{ matrix.family }}

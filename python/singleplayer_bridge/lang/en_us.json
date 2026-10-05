@@ -206,5 +206,13 @@
   "mcdr-singleplayer.error.restore_file_still_in_use": "World file is still in use or cannot be replaced: %s — close the program using it (Minecraft may need to exit completely) and retry the restore",
   "mcdr-singleplayer.error.restore_directory_still_in_use": "Cannot move world folder %s — close File Explorer windows showing the world or its subfolders and other programs using it, then retry the restore",
   "mcdr-singleplayer.error.restore_native_library_in_use": "Native library is still in use: %s — fully exit Minecraft clients using this game directory before retrying; returning to the main menu may not unload a DLL",
-  "mcdr-singleplayer.error.restore_backup_has_no_level_dat": "This restore backup does not contain a regular level.dat file"
+  "mcdr-singleplayer.error.restore_backup_has_no_level_dat": "This restore backup does not contain a regular level.dat file",
+  "mcdr-singleplayer.restore.retry.button": "Retry restore",
+  "mcdr-singleplayer.restore.retry.title": "Choose a backup to restore",
+  "mcdr-singleplayer.restore.retry.back": "Back to main menu",
+  "mcdr-singleplayer.restore.retry.loading": "Loading Prime Backup backups",
+  "mcdr-singleplayer.restore.retry.empty": "No Prime Backup backups exist for this world",
+  "mcdr-singleplayer.restore.retry.confirm": "Restore backup #%s",
+  "mcdr-singleplayer.restore.retry.warning": "The current world is preserved in recovery-history",
+  "mcdr-singleplayer.restore.retry.safety_backup": "Pre-restore safety backup #%s"
 }

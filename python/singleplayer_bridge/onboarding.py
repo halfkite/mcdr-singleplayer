@@ -1,14 +1,13 @@
 """Local first-run chat and explicit, verified installation of backup plugins."""
-import json
 import os
 import threading
-import zipfile
 from pathlib import Path
 
 from mcdreforged.api.rtext import RAction, RColor, RText, RTextList
 
 from .backup_guard import checked_path
 from .config_file import read as read_bridge_config, write as write_bridge_config
+from .plugin_archives import archives
 from .profiles import read_json, write_json
 from .i18n import tr, locale
 
@@ -20,29 +19,6 @@ _shown = set()
 _settings_shown = set()
 _install_lock = threading.Lock()
 _preferences_lock = threading.Lock()
-
-
-def archives(common, plugin_id):
-    result = []
-    for path in (Path(common) / 'plugins').iterdir():
-        if path.name.endswith('.disabled'):
-            continue
-        if path.is_dir() and (path / 'mcdreforged.plugin.json').is_file():
-            try:
-                metadata = read_json(path / 'mcdreforged.plugin.json')
-            except ValueError:
-                continue
-        elif path.is_file() and zipfile.is_zipfile(path):
-            with zipfile.ZipFile(path) as archive:
-                try:
-                    metadata = json.loads(archive.read('mcdreforged.plugin.json'))
-                except (KeyError, ValueError):
-                    continue
-        else:
-            continue
-        if metadata.get('id') == plugin_id:
-            result.append((path, metadata.get('version')))
-    return result
 
 
 def common_preferences(**changes):
