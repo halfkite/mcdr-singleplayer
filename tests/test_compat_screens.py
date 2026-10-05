@@ -32,6 +32,7 @@ def test_setup_dialogs_use_the_target_screen_api(loader, row):
 def test_family_build_rejects_old_version_and_ignores_stale_jars(tmp_path, monkeypatch):
     monkeypatch.setattr(build_matrix, 'ROOT', tmp_path)
     monkeypatch.setattr(build_matrix, 'VERSION', '0.4.2')
+    monkeypatch.setattr(build_matrix, 'BUILD_VERSION', '0.4.2')
     libs = tmp_path / 'build/matrix/fabric/26.3/build/libs'
     libs.mkdir(parents=True)
     (libs / 'mcdr-singleplayer-0.3.10+fabric+mc26.3.jar').write_bytes(b'old build')
