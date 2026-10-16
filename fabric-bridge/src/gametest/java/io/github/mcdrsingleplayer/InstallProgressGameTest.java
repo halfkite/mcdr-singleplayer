@@ -1,21 +1,21 @@
 package io.github.mcdrsingleplayer;
 
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CopyOnWriteArrayList;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.minecraft.network.chat.Component;
-import com.mojang.blaze3d.platform.InputConstants;
 
-/** Real rendering and close controls with deterministic installer stages in an isolated world. */
+/**
+ * Installation progress inside a world is chat only: entering a save must never open the
+ * download prompt, and the stage text has to be translated for every shipped language.
+ */
 public final class InstallProgressGameTest implements FabricClientGameTest {
     @Override public void runTest(ClientGameTestContext context) {
         if (MultiClientGameTest.selected()) return;
         String original = context.computeOnClient(client -> client.getLanguageManager().getSelected());
-        boolean pauseOnLostFocus = context.computeOnClient(client -> client.options.pauseOnLostFocus);
-        context.runOnClient(client -> client.options.pauseOnLostFocus = false);
-        var value = new AtomicReference<>(new InstallProgress("dependencies", 2));
-        var dismissed = new AtomicInteger();
+        var messages = new CopyOnWriteArrayList<String>();
+        ClientReceiveMessageEvents.GAME.register((message, overlay) -> messages.add(message.getString()));
         try (var world = context.worldBuilder().create()) {
             for (String language : new String[]{"zh_cn", "zh_tw", "en_us"}) {
                 var reload = context.computeOnClient(client -> {
@@ -23,30 +23,24 @@ public final class InstallProgressGameTest implements FabricClientGameTest {
                     return client.reloadResourcePacks();
                 });
                 context.waitFor(client -> reload.isDone(), 2400);
-                value.set(new InstallProgress("dependencies", 2));
-                context.setScreen(() -> new McdrInstallNoticeScreen(value::get, dismissed::incrementAndGet));
-                context.waitFor(client -> !client.isPaused(), 200);
+                messages.clear();
+                context.runOnClient(client -> {
+                    var progress = new InstallProgress("dependencies", 2);
+                    Component stage = Component.translatable(progress.translationKey())
+                            .copy().append(Component.translatable("mcdr-singleplayer.install.attempt", progress.attempt()));
+                    // The same message the client tick sends while an installation is running.
+                    client.player.sendSystemMessage(Component.translatable("mcdr-singleplayer.install.chat", stage));
+                });
                 context.waitTicks(5);
-                context.takeScreenshot("install-progress-" + language);
-                context.getInput().pressKey(InputConstants.KEY_ESCAPE);
-                context.waitFor(client -> client.gui.screen() == null);
-                BridgeGameTest.check(value.get().stage().equals("dependencies"), "Closing cancelled installation");
-                context.runOnClient(client -> client.player.sendSystemMessage(Component.translatable(
-                        "mcdr-singleplayer.install.chat", Component.translatable(value.get().translationKey()))));
-                context.waitTicks(5);
+                BridgeGameTest.check(messages.stream().anyMatch(text -> text.contains("[mcdr-singleplayer]")),
+                        "Installation chat is missing: " + language + " " + messages);
+                BridgeGameTest.check(messages.stream().noneMatch(text -> text.contains("mcdr-singleplayer.install")),
+                        "Installation chat was not translated: " + language + " " + messages);
+                BridgeGameTest.check(context.computeOnClient(client -> client.gui.screen() == null),
+                        "Installation progress opened a screen inside a world: " + language);
                 context.takeScreenshot("install-progress-chat-" + language);
             }
-            for (String stage : new String[]{"failed", "ready"}) {
-                value.set(new InstallProgress(stage, 0));
-                context.setScreen(() -> new McdrInstallNoticeScreen(value::get, dismissed::incrementAndGet));
-                context.waitTicks(5);
-                context.takeScreenshot("install-progress-" + stage);
-                context.clickScreenButton("mcdr-singleplayer.python.close");
-                context.waitFor(client -> client.gui.screen() == null);
-            }
-            BridgeGameTest.check(dismissed.get() == 5, "Close callback did not run exactly once per screen");
         } finally {
-            context.runOnClient(client -> client.options.pauseOnLostFocus = pauseOnLostFocus);
             var reload = context.computeOnClient(client -> {
                 client.getLanguageManager().setSelected(original);
                 return client.reloadResourcePacks();

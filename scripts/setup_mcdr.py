@@ -39,7 +39,9 @@ def main():
         from ruamel.yaml import YAML
         import mcdreforged
     except ImportError:
-        parser.error('install MCDR first: python -m pip install mcdreforged==2.16.0')
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'python'))
+        from singleplayer_bridge.bootstrap import MCDR_VERSION
+        parser.error('install MCDR first: python -m pip install mcdreforged==' + MCDR_VERSION)
     sys.path.insert(0, str(runtime))
     from singleplayer_bridge.profiles import ensure_profile
     from singleplayer_bridge.bootstrap import configure_common

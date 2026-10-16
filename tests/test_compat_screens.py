@@ -10,7 +10,7 @@ from neoforge_compat import write_platform
 @pytest.mark.parametrize('row', MATRIX['versions'], ids=lambda row: row['minecraft'])
 def test_setup_dialogs_use_the_target_screen_api(loader, row):
     parts = tuple(map(int, row['minecraft'].split('.')))
-    for name in ['SingleplayerBridge.java', 'PythonSetupScreen.java', 'McdrInstallNoticeScreen.java']:
+    for name in ['SingleplayerBridge.java', 'PythonSetupScreen.java', 'McdrSetupScreen.java']:
         source = (ROOT / 'fabric-bridge/src/main/java/io/github/mcdrsingleplayer' / name).read_text(encoding='utf8')
         generated = adapt_java(source, name, row, loader)
         if parts < (26, 2):

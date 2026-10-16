@@ -91,9 +91,23 @@ def adapt_java(text, name, row, loader):
             text = text.replace('net.minecraft.util.Util', 'net.minecraft.Util')
         text = text.replace('client.gui.setScreen(', 'client.setScreen(')
         text = text.replace('getInstance().gui.setScreen(', 'getInstance().setScreen(')
-        if name in ('RestoreTitleScreenMixin.java', 'PythonSetupScreen.java', 'McdrInstallNoticeScreen.java'):
+        # Fabric renamed the title-screen widget accessor when screens moved to render states.
+        text = text.replace('Screens.getWidgets(', 'Screens.getButtons(')
+        if 'FontDescription' in text:
+            # 26.x wraps a named font in FontDescription; older Style takes the resource directly.
+            text = text.replace('new net.minecraft.network.chat.FontDescription.Resource(', '(')
+        if 'mcdr-singleplayer:icon' in text:
+            text = text.replace('net.minecraft.resources.Identifier', 'net.minecraft.resources.ResourceLocation')
+        if name in ('RestoreTitleScreenMixin.java', 'PythonSetupScreen.java', 'McdrSetupScreen.java'):
             text = text.replace('GuiGraphicsExtractor', 'GuiGraphics').replace('extractRenderState', 'render')
             text = text.replace('graphics.centeredText', 'graphics.drawCenteredString')
+        if name == 'MenuIconButton.java':
+            # Older versions draw widgets through the pre-extraction render method and take an
+            # explicit pipeline argument for textured blits.
+            text = text.replace('GuiGraphicsExtractor', 'GuiGraphics')
+            text = text.replace('extractContents', 'renderWidget')
+            text = text.replace('RenderPipelines.GUI_TEXTURED, ICON,', 'ICON,')
+            text = text.replace('ICON_SIZE, ICON_SIZE, 0xffffffff)', 'ICON_SIZE, ICON_SIZE)')
         if name == 'RestoreBackupSelectionScreen.java':
             text = text.replace('GuiGraphicsExtractor', 'GuiGraphics').replace('extractRenderState', 'render')
             text = text.replace('graphics.centeredText', 'graphics.drawCenteredString')

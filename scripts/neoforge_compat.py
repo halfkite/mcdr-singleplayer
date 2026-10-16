@@ -97,11 +97,11 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.*;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
-final class NeoPlatform {
-    static final class Loader {
-        static Loader getInstance() { return new Loader(); }
-        java.nio.file.Path getGameDir() { return net.neoforged.fml.loading.FMLPaths.GAMEDIR.get(); }
-        boolean isModLoaded(String id) { return net.neoforged.fml.ModList.get().isLoaded(id); }
+public final class NeoPlatform {
+    public static final class Loader {
+        public static Loader getInstance() { return new Loader(); }
+        public java.nio.file.Path getGameDir() { return net.neoforged.fml.loading.FMLPaths.GAMEDIR.get(); }
+        public boolean isModLoaded(String id) { return net.neoforged.fml.ModList.get().isLoaded(id); }
     }
     static void started(Consumer<Minecraft> action) {
         NeoForge.EVENT_BUS.addListener(new Consumer<ClientTickEvent.Post>() {

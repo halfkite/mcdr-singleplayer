@@ -2,6 +2,7 @@
 from singleplayer_bridge.i18n import tr
 import argparse
 import hashlib
+import json
 import logging
 import os
 import shutil
@@ -19,6 +20,8 @@ from .installation_progress import InstallationProgress
 PRIME_VERSION = '1.13.1'
 PRIME_HASH = '081c91872ff3f6ab438328b96237e5e8db87ebff28e46b909eca804b6320db2b'
 PRIME_URL = 'https://github.com/TISUnion/PrimeBackup/releases/download/v1.13.1/PrimeBackup-v1.13.1.pyz'
+# The MCDR release this bridge is adapted to; the mod passes the same value before installing.
+MCDR_VERSION = '2.16.0'
 PIP_INDEXES = ['https://pypi.org/simple', 'https://pypi.tuna.tsinghua.edu.cn/simple', 'https://mirrors.aliyun.com/pypi/simple/']
 DEFAULT_MIRRORS = ['https://gh-proxy.com/']
 
@@ -29,7 +32,7 @@ def download_checked(urls, destination, digest, opener=urllib.request.urlopen):
     for url in urls:
         try:
             started = time.monotonic()
-            request = urllib.request.Request(url, headers={'User-Agent': 'MCDR-Singleplayer-Bridge/0.5.2'})
+            request = urllib.request.Request(url, headers={'User-Agent': 'MCDR-Singleplayer-Bridge/0.6.0'})
             with opener(request, timeout=15) as response, temporary.open('wb') as output:
                 total = 0
                 while chunk := response.read(65536):
@@ -110,7 +113,7 @@ def install(common, resources, update=False, progress=None, controller_locked=Fa
     previous = read_json(marker) if marker.exists() else {}
     probe = subprocess.run([str(python), '-c',
         "import apscheduler, sqlalchemy, blake3, mcdreforged, pathspec, psutil, pydantic, pytz, typing_extensions, xxhash, zstandard; "
-        "from importlib.metadata import version; assert version('mcdreforged') == '2.16.0'"],
+        "from importlib.metadata import version; assert version('mcdreforged') == '" + MCDR_VERSION + "'"],
         capture_output=True, timeout=30, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     if update or probe.returncode != 0 or previous.get('requirements_sha256') != signature or time.time() - previous.get('checked_at', 0) > 86400:
         install_dependencies(python, requirements, progress=progress)
@@ -158,8 +161,32 @@ def install(common, resources, update=False, progress=None, controller_locked=Fa
             history.mkdir(parents=True, exist_ok=True)
             shutil.move(str(file), str(history / file.name))
         prepared.replace(target)
-    write_json(marker, dict(mcdr='2.16.0', backup_plugins_opt_in=True, requirements_sha256=signature, checked_at=time.time(), python=str(python)))
+    write_json(marker, dict(mcdr=MCDR_VERSION, backup_plugins_opt_in=True, requirements_sha256=signature, checked_at=time.time(), python=str(python)))
     return python
+
+
+def install_state(common, expected=MCDR_VERSION):
+    """Report whether the shared runtime already offers the adapted MCDR release."""
+    common = Path(common).resolve()
+    environment = common / 'runtime/.bridge-venv'
+    python = environment / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+    if not python.exists():
+        return 'missing', 'the isolated environment is absent'
+    probe = subprocess.run([str(python), '-c', "import importlib.metadata as m; print(m.version('mcdreforged'))"],
+                           capture_output=True, text=True, timeout=30,
+                           creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    if probe.returncode != 0:
+        return 'broken', 'the isolated environment cannot load MCDR'
+    installed = (probe.stdout or '').strip().splitlines()
+    version = installed[-1] if installed else ''
+    marker_path = common / 'runtime/runtime-install.json'
+    marker = read_json(marker_path) if marker_path.exists() else {}
+    # An older marker records an installation that predates this bridge build.
+    if marker.get('mcdr') != expected:
+        return 'outdated', f"the installation marker records {marker.get('mcdr') or 'no version'}"
+    if version != expected:
+        return 'outdated', f"the environment provides MCDR {version or 'nothing'}"
+    return 'ready', f'MCDR {version} is installed'
 
 
 def main():
@@ -167,6 +194,8 @@ def main():
     parser.add_argument('--common', required=True, type=Path)
     parser.add_argument('--resources', required=True, type=Path)
     parser.add_argument('--update', action='store_true')
+    parser.add_argument('--check-only', action='store_true')
+    parser.add_argument('--expected-mcdr', default=MCDR_VERSION)
     parser.add_argument('--configure-only', action='store_true')
     parser.add_argument('--config', type=Path)
     parser.add_argument('--state', type=Path)
@@ -182,6 +211,14 @@ def main():
     if args.configure_only:
         configure_common(args.common.resolve(), Path(sys.executable), args.common.resolve() / 'runtime/bridge-runtime')
         return 0
+    if args.expected_mcdr != MCDR_VERSION:
+        logging.error('The bridge bundle expects MCDR %s but this installer adapts %s', args.expected_mcdr, MCDR_VERSION)
+        return 3
+    if args.check_only:
+        status, detail = install_state(args.common, args.expected_mcdr)
+        logging.info('Runtime check: %s (%s)', status, detail)
+        print(json.dumps(dict(protocol=1, status=status, expected_mcdr=args.expected_mcdr, detail=detail)))
+        return 0 if status == 'ready' else 3
     progress = InstallationProgress(args.common, args.client_id)
     try:
         from .supervisor import lock_common

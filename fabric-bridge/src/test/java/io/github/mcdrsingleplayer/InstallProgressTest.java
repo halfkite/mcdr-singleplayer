@@ -10,7 +10,7 @@ class InstallProgressTest {
         var failed = new InstallProgress("failed", 0);
         assertTrue(feedback.shouldAnnounce(failed, 2000));
         assertFalse(feedback.shouldAnnounce(failed, 23000));
-        assertFalse(feedback.shouldOpen(failed, true));
+        assertFalse(failed.running());
     }
 
     @Test void ignoresPreviousLaunchAndMalformedOrUnknownStages() {
@@ -23,12 +23,9 @@ class InstallProgressTest {
         assertNull(InstallProgress.parse(status.replace("\"attempt\":2", "\"attempt\":-1"), "current"));
     }
 
-    @Test void deferredWindowOpensOnceAndClosingDoesNotSilenceChatOrReopenIt() {
+    @Test void announcesStageChangesAndRemindsAtMostEveryTwentySeconds() {
         var feedback = new InstallProgress.Feedback();
         var dependencies = new InstallProgress("dependencies", 1);
-        assertFalse(feedback.shouldOpen(dependencies, false));
-        assertTrue(feedback.shouldOpen(dependencies, true));
-        assertFalse(feedback.shouldOpen(dependencies, true));
         assertTrue(feedback.shouldAnnounce(dependencies, 1000));
         assertFalse(feedback.shouldAnnounce(dependencies, 1500));
         assertTrue(feedback.shouldAnnounce(dependencies, 21000));
@@ -37,20 +34,43 @@ class InstallProgressTest {
         var ready = new InstallProgress("ready", 0);
         assertTrue(feedback.shouldAnnounce(ready, 23000));
         assertFalse(feedback.shouldAnnounce(ready, 24000));
-        assertFalse(feedback.shouldOpen(new InstallProgress("starting", 0), true));
-        assertFalse(feedback.shouldAnnounce(dependencies, 45000));
+        // A finished installation never repeats, and no world re-entry can restart the reminders.
+        assertFalse(feedback.shouldAnnounce(new InstallProgress("starting", 0), 45000));
+        assertFalse(feedback.shouldAnnounce(dependencies, 65000));
     }
 
-    @Test void existingReadyInstallationIsQuietAndFailureIsExplicitWithoutRepeatedPopups() {
+    @Test void aRunningControllerNeverRepeatsStartupChatInsideAWorld() {
+        var feedback = new InstallProgress.Feedback();
+        var starting = new InstallProgress("starting", 0);
+        // The real log showed this exact line repeating every 20 seconds for five minutes.
+        for (long now = 0; now < 600_000; now += 20_000) {
+            assertFalse(feedback.shouldAnnounceInstallation(starting, now), "starting repeated at " + now);
+        }
+        assertFalse(feedback.shouldAnnounceInstallation(new InstallProgress("waiting_instance", 0), 0),
+                "waiting_instance is not installation work");
+        assertFalse(feedback.shouldAnnounceInstallation(new InstallProgress("ready", 0), 0),
+                "An already prepared runtime must stay quiet");
+        assertTrue(starting.running(), "The controller is still running even though it is not installing");
+        assertFalse(starting.installing());
+    }
+
+    @Test void realInstallationWorkStillReportsItsStages() {
+        var feedback = new InstallProgress.Feedback();
+        assertTrue(feedback.shouldAnnounceInstallation(new InstallProgress("preparing", 0), 0));
+        assertTrue(feedback.shouldAnnounceInstallation(new InstallProgress("dependencies", 1), 1000));
+        assertFalse(feedback.shouldAnnounceInstallation(new InstallProgress("dependencies", 1), 5000));
+        assertTrue(feedback.shouldAnnounceInstallation(new InstallProgress("dependencies", 1), 21000));
+        assertTrue(feedback.shouldAnnounceInstallation(new InstallProgress("failed", 0), 22000));
+        // Once the controller is up, nothing more is announced about installation.
+        assertFalse(feedback.shouldAnnounceInstallation(new InstallProgress("starting", 0), 23000));
+    }
+
+    @Test void existingReadyInstallationIsQuietAndFailureIsExplicit() {
         var existing = new InstallProgress.Feedback();
         assertFalse(existing.shouldAnnounce(new InstallProgress("ready", 0), 0));
-        assertFalse(existing.shouldOpen(new InstallProgress("ready", 0), true));
         var feedback = new InstallProgress.Feedback();
         var failed = new InstallProgress("failed", 0);
-        assertTrue(feedback.shouldOpen(failed, true));
         assertTrue(feedback.shouldAnnounce(failed, 0));
         assertFalse(feedback.shouldAnnounce(failed, 30000));
-        assertFalse(feedback.shouldOpen(failed, true));
-        assertFalse(failed.running());
     }
 }

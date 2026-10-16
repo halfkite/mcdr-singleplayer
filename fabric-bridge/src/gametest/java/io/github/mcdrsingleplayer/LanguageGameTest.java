@@ -30,6 +30,13 @@ public final class LanguageGameTest implements FabricClientGameTest {
                     default -> "Restore complete";
                 };
                 BridgeGameTest.check(context.computeOnClient(client -> Component.translatable("mcdr-singleplayer.restore.title.completed").getString()).equals(expectedTitle), "Native restore translation failed: " + language);
+                for (String key : new String[]{"setup.button", "setup.title", "setup.checking", "setup.ready", "setup.missing",
+                        "setup.outdated", "setup.broken", "setup.installing", "setup.failed", "setup.download", "setup.close",
+                        "setup.escape_hint", "setup.menu_hint"}) {
+                    String translated = context.computeOnClient(client -> Component.translatable("mcdr-singleplayer." + key).getString());
+                    BridgeGameTest.check(!translated.startsWith("mcdr-singleplayer.") && !translated.isBlank(),
+                            "Missing " + key + " translation: " + language);
+                }
                 messages.clear();
                 var world = context.worldBuilder().create();
                 var profile = common.resolve("plugindata").resolve(world.getWorldSave().getSaveDirectory().getFileName());

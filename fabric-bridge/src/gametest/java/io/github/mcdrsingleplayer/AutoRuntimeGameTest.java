@@ -56,7 +56,7 @@ public final class AutoRuntimeGameTest implements FabricClientGameTest {
                 from mcdreforged.api.command import Literal, QuotableText
                 import os, time
                 from pathlib import Path
-                PLUGIN_METADATA = {'id': 'test_command_probe', 'version': '1.0.0', 'dependencies': {'prime_backup': '==1.13.1', 'singleplayer_prime_backup': '==0.5.2'}}
+                PLUGIN_METADATA = {'id': 'test_command_probe', 'version': '1.0.0', 'dependencies': {'prime_backup': '==1.13.1', 'singleplayer_prime_backup': '==0.6.0'}}
                 _export = None
                 ExportBackupToDirectoryAction = None
                 def on_load(server, previous):
@@ -111,7 +111,13 @@ public final class AutoRuntimeGameTest implements FabricClientGameTest {
             guestRuntime = new AutoRuntime(guestConfig, BridgeConfig.pathForGame(game), game);
             guestRuntime.start();
             AutoRuntime guestObserver = guestRuntime;
-            context.waitFor(client -> guestObserver.installProgress(false).stage().equals("waiting_instance"), 2400);
+            // The second client shares an installed runtime, so it either waits for the live
+            // controller or asks for its own download instead of installing without consent.
+            context.waitFor(client -> guestObserver.installProgress(false).stage().equals("waiting_instance")
+                    || !guestObserver.setupStatus().reason().isEmpty(), 6000);
+            BridgeGameTest.check(guestObserver.installProgress(false).stage().equals("waiting_instance")
+                            || guestObserver.setupStatus().actionNeeded(),
+                    "A second client did not detect the shared MCDR installation");
             context.runOnClient(client -> client.player.connection.sendCommand("!!extra_alias nested leaf alpha"));
             context.waitFor(client -> messages.contains("EXTRA_OK alpha"), 800);
             BridgeGameTest.check(PrimeBackupGameTest.count(controllerLog, "MCDR profile started:") == profilesBefore + 1,

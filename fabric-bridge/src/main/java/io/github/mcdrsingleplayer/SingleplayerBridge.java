@@ -17,15 +17,25 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.commands.CommandSource;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.storage.LevelResource;
+import net.minecraft.ChatFormatting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public final class SingleplayerBridge implements ModInitializer {
     private static final Logger LOGGER = LoggerFactory.getLogger("mcdr_singleplayer_bridge");
+    /** The mod entrypoint, so the title screen widget can read this launch's setup state. */
+    private static volatile SingleplayerBridge INSTANCE;
+    /** Fallback for the bundled materials folder; matches gradle.properties and is release-checked. */
+    private static final String BUNDLED_VERSION = "0.6.0";
     private volatile BridgeEndpoint endpoint;
     private volatile MinecraftServer worldServer;
     private BridgeConfig config;
@@ -34,8 +44,13 @@ public final class SingleplayerBridge implements ModInitializer {
     private RestoreProgressMonitor restoreProgress;
     private boolean showingPythonPrompt;
     private boolean pythonPromptDismissed;
-    private boolean showingMcdrInstallNotice;
     private InstallProgress.Feedback installFeedback = new InstallProgress.Feedback();
+    private boolean mcdrSetupPromptShown;
+    private boolean mcdrSetupPromptDismissed;
+    private boolean mcdrNoticeAnnounced;
+    private int setupCheckTicks;
+    /** The title screen entry of the current screen, refreshed while it is shown. */
+    private MenuIconButton menuButton;
     private final ClientCommandTree clientCommands = new ClientCommandTree(() -> endpoint, this::forward);
     private final ServerCommandTree serverCommands = new ServerCommandTree(() -> endpoint);
     private final Map<ServerLevel, Boolean> previousAutoSave = new HashMap<>();
@@ -48,6 +63,7 @@ public final class SingleplayerBridge implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        INSTANCE = this;
         configPath = BridgeConfig.pathForGame(FabricLoader.getInstance().getGameDir());
         try {
             config = BridgeConfig.loadForGame(FabricLoader.getInstance().getGameDir());
@@ -67,10 +83,11 @@ public final class SingleplayerBridge implements ModInitializer {
         monitorRestore(BridgeConfig.runtimeForGame(FabricLoader.getInstance().getGameDir()).resolve(".mcdr_restore_progress.json"));
         if (!config.enabled) return;
         if (config.autoStartMcdr && !FabricLoader.getInstance().isModLoaded("singleplayer_bridge_gametest")) {
-            runtime = new AutoRuntime(config, configPath, FabricLoader.getInstance().getGameDir());
+            runtime = new AutoRuntime(config, configPath, FabricLoader.getInstance().getGameDir(), modVersion());
             ClientLifecycleEvents.CLIENT_STARTED.register(client -> runtime.start());
             ClientLifecycleEvents.CLIENT_STOPPING.register(client -> runtime.closing());
         }
+        if (!FabricLoader.getInstance().isModLoaded("singleplayer_bridge_gametest")) registerMenuButton();
         registerClientCommands();
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             if (server.isDedicatedServer()) return;
@@ -134,8 +151,9 @@ public final class SingleplayerBridge implements ModInitializer {
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             clientCommands.tick();
+            if (menuButton != null) menuButton.refresh();
             if (runtime != null) {
-                boolean inSingleplayer = client.getSingleplayerServer() != null && client.player != null && client.level != null;
+                boolean inSingleplayer = inSingleplayer(client);
                 if (runtime.pythonMissing() && inSingleplayer) {
                     if (!showingPythonPrompt && !pythonPromptDismissed) {
                         showingPythonPrompt = true;
@@ -144,30 +162,29 @@ public final class SingleplayerBridge implements ModInitializer {
                             pythonPromptDismissed = true;
                         }));
                     }
-                } else if (runtime.pythonReady() && inSingleplayer) {
+                } else if (!inSingleplayer) {
+                    if ((showingPythonPrompt && client.gui.screen() instanceof PythonSetupScreen)) client.gui.setScreen(null);
+                    showingPythonPrompt = false;
+                    pythonPromptDismissed = false;
+                    installFeedback = new InstallProgress.Feedback();
+                    // A new visit to the menu may announce the missing runtime once more.
+                    mcdrNoticeAnnounced = false;
+                    pollMcdrSetup(client);
+                    if (!mcdrSetupPromptDismissed) maybeOpenMcdrSetupPrompt(client);
+                } else if (runtime.pythonReady()) {
                     InstallProgress value = currentInstallProgress();
-                    if (installFeedback.shouldAnnounce(value, System.currentTimeMillis())) {
+                    // Only real installation work is narrated; a running controller must stay quiet.
+                    if (installFeedback.shouldAnnounceInstallation(value, System.currentTimeMillis())) {
                         Component stage = Component.translatable(value.translationKey());
                         if (value.attempt() > 0) stage = stage.copy().append(Component.translatable(
                                 "mcdr-singleplayer.install.attempt", value.attempt()));
                         client.player.sendSystemMessage(Component.translatable("mcdr-singleplayer.install.chat", stage));
                     }
-                    if (installFeedback.shouldOpen(value, client.gui.screen() == null
-                            || client.gui.screen() instanceof PythonSetupScreen)) {
-                        showingPythonPrompt = false;
-                        showingMcdrInstallNotice = true;
-                        client.gui.setScreen(new McdrInstallNoticeScreen(this::currentInstallProgress,
-                                () -> showingMcdrInstallNotice = false));
+                    if (!mcdrNoticeAnnounced && runtime.setupStatus() != null
+                            && !runtime.setupStatus().running() && !value.running()) {
+                        mcdrNoticeAnnounced = true;
+                        client.player.sendSystemMessage(Component.translatable("mcdr-singleplayer.setup.menu_hint"));
                     }
-                } else if (!inSingleplayer) {
-                    if ((showingPythonPrompt && client.gui.screen() instanceof PythonSetupScreen)
-                            || (showingMcdrInstallNotice && client.gui.screen() instanceof McdrInstallNoticeScreen)) {
-                        client.gui.setScreen(null);
-                    }
-                    showingPythonPrompt = false;
-                    showingMcdrInstallNotice = false;
-                    pythonPromptDismissed = false;
-                    installFeedback = new InstallProgress.Feedback();
                 }
             }
             BridgeEndpoint bridge = endpoint;
@@ -182,8 +199,123 @@ public final class SingleplayerBridge implements ModInitializer {
     }
 
     private InstallProgress currentInstallProgress() {
-        BridgeEndpoint bridge = endpoint;
-        return runtime.installProgress(bridge != null && bridge.connected());
+        return runtime.installProgress(false);
+    }
+
+    private static boolean inSingleplayer(Minecraft client) {
+        return client.getSingleplayerServer() != null && client.player != null && client.level != null;
+    }
+
+    /** Refresh the published setup reason while the player is at the menu. */
+    private void pollMcdrSetup(Minecraft client) {
+        McdrSetup setup = runtime.setupStatus();
+        if (setup == null) return;
+        if (--setupCheckTicks <= 0) {
+            setupCheckTicks = 20;
+            if (client.gui.screen() instanceof TitleScreen) setup.write();
+        }
+    }
+
+    /** One dismissible prompt per launch; the menu button reopens the same information later. */
+    private void maybeOpenMcdrSetupPrompt(Minecraft client) {
+        if (mcdrSetupPromptShown) return;
+        if (!(client.gui.screen() instanceof TitleScreen)) return;
+        if (client.getSingleplayerServer() != null) return;
+        McdrSetup setup = runtime.setupStatus();
+        if (setup != null && setup.actionNeeded() && !setup.reason().isEmpty()) {
+            mcdrSetupPromptShown = true;
+            openMcdrSetup(client, true);
+        }
+    }
+
+    /**
+     * The auto-opened prompt dismisses for the rest of this launch; the manual button only returns
+     * to the menu, so reopening it from the menu never hides the download from later visits.
+     */
+    private void openMcdrSetup(Minecraft client, boolean dismissAfterClose) {
+        client.gui.setScreen(new McdrSetupScreen(new McdrSetupScreen.Behaviour() {
+            @Override public McdrSetupScreen.View view() { return mcdrSetupView(); }
+
+            @Override public void install() {
+                runtime.requestInstall();
+                client.gui.setScreen(null);
+            }
+
+            @Override public void dismiss() {
+                if (dismissAfterClose) mcdrSetupPromptDismissed = true;
+            }
+        }));
+    }
+
+    /**
+     * MCDR itself is the only thing the menu offers to install here. This screen prepares the
+     * shared runtime, so a finished install moves straight to ready without waiting for a world.
+     */
+    private McdrSetupScreen.View mcdrSetupView() {
+        McdrSetup setup = runtime.setupStatus();
+        InstallProgress progress = runtime.installProgress(false);
+        return new McdrSetupScreen.View(setupStatus(setup, progress), setup == null ? "" : setup.reason(), progress);
+    }
+
+    static McdrSetupScreen.Status setupStatus(McdrSetup setup, InstallProgress progress) {
+        if (setup == null) return McdrSetupScreen.Status.CHECKING;
+        String reason = setup.reason();
+        if (McdrSetup.READY.equals(reason)) return McdrSetupScreen.Status.READY;
+        if (setup.running()) {
+            if (progress.stage().equals("failed")) return McdrSetupScreen.Status.FAILED;
+            // The controller reaches this stage with MCDR fully prepared and waiting for a world.
+            return !progress.stage().equals("starting") && !progress.stage().equals("ready")
+                    ? McdrSetupScreen.Status.INSTALLING : McdrSetupScreen.Status.READY;
+        }
+        if (reason.equals("failed")) return McdrSetupScreen.Status.FAILED;
+        return reason.isEmpty() ? McdrSetupScreen.Status.CHECKING : McdrSetupScreen.Status.NEEDS_INSTALL;
+    }
+
+    /**
+     * Menu entry next to the vanilla Mods button. Fabric's screen event runs at the right moment
+     * without a mixin, and it replaces any previous screen, so the entry is created here.
+     */
+    private void registerMenuButton() {
+        net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.AFTER_INIT.register((client, screen, width, height) -> {
+            if (!(screen instanceof TitleScreen)) return;
+            MenuIconButton button = new MenuIconButton(0, 0, 20, 20, pressed -> openMcdrSetup(client, false));
+            button.visible = runtime != null;
+            net.fabricmc.fabric.api.client.screen.v1.Screens.getWidgets(screen).add(button);
+            button.refresh();
+            menuButton = button;
+            placeMenuButton(button, net.fabricmc.fabric.api.client.screen.v1.Screens.getWidgets(screen),
+                    width, height);
+        });
+    }
+
+    /** Same rules Flashback uses; the entry never lands on top of another mod's button. */
+    private static void placeMenuButton(MenuIconButton button, java.util.List<AbstractWidget> widgets,
+            int screenWidth, int screenHeight) {
+        java.util.List<MenuButtonPlacement.Box> boxes = new java.util.ArrayList<>(widgets.size());
+        for (AbstractWidget widget : widgets) {
+            boxes.add(new MenuButtonPlacement.Box(widget.getX(), widget.getY(), widget.getWidth(),
+                    widget.getHeight(), widget.visible));
+        }
+        MenuButtonPlacement.Box own = new MenuButtonPlacement.Box(button.getX(), button.getY(), button.getWidth(),
+                button.getHeight(), true);
+        MenuButtonPlacement.Box replay = null;
+        String replayLabel = Component.translatable(MenuButtonPlacement.FLASHBACK_REPLAY_LABEL).getString();
+        for (AbstractWidget widget : widgets) {
+            if (widget != button && widget.getMessage().getString().startsWith(replayLabel)) {
+                replay = new MenuButtonPlacement.Box(widget.getX(), widget.getY(), widget.getWidth(),
+                        widget.getHeight(), widget.visible);
+                break;
+            }
+        }
+        MenuButtonPlacement.Position position = MenuButtonPlacement.place(boxes, own, replay, screenWidth, screenHeight);
+        if (position != null) button.setPosition(position.x(), position.y());
+    }
+
+    /** Marks the menu entry while MCDR still needs a download or an update. */
+    public static boolean setupNeedsAttention() {
+        SingleplayerBridge bridge = INSTANCE;
+        return bridge != null && bridge.runtime != null && bridge.runtime.setupStatus() != null
+                && bridge.runtime.setupStatus().actionNeeded();
     }
 
     private void monitorRestore(Path progressPath) {
@@ -197,8 +329,16 @@ public final class SingleplayerBridge implements ModInitializer {
     // The client integration fixture uses an isolated installation without touching the user's MCDR.
     void enableTestAutomation(Path common, String python) {
         config.pythonExecutable = python;
-        runtime = new AutoRuntime(config, configPath, FabricLoader.getInstance().getGameDir());
+        runtime = new AutoRuntime(config, configPath, FabricLoader.getInstance().getGameDir(), modVersion());
         runtime.start();
+    }
+
+    /** The jar that ships the installer materials owns their folder name. */
+    private static String modVersion() {
+        return FabricLoader.getInstance().getModContainer("mcdr-singleplayer")
+                .map(container -> container.getMetadata().getVersion().getFriendlyString())
+                .filter(version -> !version.isBlank())
+                .orElse(BUNDLED_VERSION);
     }
 
     private void registerClientCommands() {

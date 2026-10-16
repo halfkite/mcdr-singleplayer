@@ -29,6 +29,6 @@ processResources {
     dependsOn 'bundleInstaller'
     from(tasks.named('bundleInstaller').flatMap { it.archiveFile })
     from('@ROOT@/python/singleplayer_bridge/lang') { into 'assets/mcdr-singleplayer/lang' }
-    from('@ROOT@/fabric-bridge/src/main/resources/assets/mcdr-singleplayer/icon.png') { into 'assets/mcdr-singleplayer' }
+    from('@ROOT@/fabric-bridge/src/main/resources/assets/mcdr-singleplayer') { into 'assets/mcdr-singleplayer' }
 }
 jar { from('@ROOT@/LICENSE') }

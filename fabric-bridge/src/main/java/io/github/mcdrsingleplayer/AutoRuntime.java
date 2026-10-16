@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipInputStream;
 import org.slf4j.Logger;
@@ -12,29 +13,47 @@ import org.slf4j.LoggerFactory;
 /** Disk discovery is token-free; installation and process I/O never run on the render thread. */
 final class AutoRuntime {
     private static final Logger LOGGER = LoggerFactory.getLogger("mcdr_singleplayer_bridge");
+    /** The tested MCDR release; the bundle's bootstrap.py declares the same version. */
+    private static final String EXPECTED_MCDR = "2.16.0";
+    /** Fallback for the materials folder when the mod container is unavailable; matches gradle.properties. */
+    private static final String BRIDGE_VERSION = "0.6.0";
+    private static final long SETUP_RECHECK_MILLIS = 3000;
     private final BridgeConfig config;
     private final Path gameConfig;
     private final Path stateFile;
     private final Path common;
+    private final String bridgeVersion;
     private final String clientId = UUID.randomUUID().toString();
+    private final CountDownLatch installRequested = new CountDownLatch(1);
+    private final com.google.gson.JsonArray setupRequests = new com.google.gson.JsonArray();
+    private McdrSetup setup;
+    private volatile int bridgePort;
     private String world;
     private String session;
     private String hostPlayer;
     private String language;
-    private int bridgePort;
     private volatile boolean closing;
     private volatile PythonStatus pythonStatus = PythonStatus.CHECKING;
     private volatile InstallProgress installProgress = new InstallProgress("preparing", 0);
-    private final com.google.gson.JsonArray setupRequests = new com.google.gson.JsonArray();
 
     private enum PythonStatus { CHECKING, MISSING, READY }
 
+    private record SetupCheck(boolean ready, String reason) { }
+
     AutoRuntime(BridgeConfig config, Path gameConfig, Path gameDirectory) {
+        this(config, gameConfig, gameDirectory, BRIDGE_VERSION);
+    }
+
+    AutoRuntime(BridgeConfig config, Path gameConfig, Path gameDirectory, String bridgeVersion) {
         this.config = config;
         this.bridgePort = config.port;
         this.gameConfig = gameConfig.toAbsolutePath();
+        this.bridgeVersion = stableVersion(bridgeVersion);
         this.stateFile = BridgeConfig.runtimeForGame(gameDirectory).resolve("clients").resolve(clientId).resolve("session.json");
         common = BridgeConfig.rootForGame(gameDirectory).toAbsolutePath().normalize();
+        // Publish the initial "checking" state before the game can draw the menu.
+        setup = new McdrSetup(stateFile.resolveSibling("setup-status.json"));
+        setup.write();
     }
 
     synchronized void publish(String world, String session) {
@@ -56,14 +75,27 @@ final class AutoRuntime {
 
     synchronized void closing() {
         closing = true;
+        // The setup thread may be waiting for the user; a closing game never installs.
+        installRequested.countDown();
         writeState(); // Keep the live world until SERVER_STOPPED confirms saving finished.
     }
 
     boolean pythonMissing() { return pythonStatus == PythonStatus.MISSING; }
     boolean pythonReady() { return pythonStatus == PythonStatus.READY; }
+    boolean pythonChecking() { return pythonStatus == PythonStatus.CHECKING; }
     boolean autoInstallEnabled() { return config.autoInstall; }
     InstallProgress installProgress(boolean connected) {
         return connected ? new InstallProgress("ready", 0) : installProgress;
+    }
+
+    McdrSetup setupStatus() { return setup; }
+
+    /** Installs MCDR after the user accepted the download from the main menu. */
+    void requestInstall() {
+        if (setup == null) return;
+        setup.installing();
+        setup.write();
+        installRequested.countDown();
     }
 
     synchronized void requestSetup(String action, String player) {
@@ -97,59 +129,143 @@ final class AutoRuntime {
     }
 
     void start() {
+        setup.write();
         publish(null, null);
-        Thread.ofVirtual().name("mcdr-python-detect").start(() -> {
-            String python = null;
-            while (!closing && python == null) {
-                python = findPython();
-                if (python == null) {
-                    if (pythonStatus != PythonStatus.MISSING) {
-                        LOGGER.info("Python 3.10 or newer with pip was not found; waiting for installation in a singleplayer world");
-                    }
-                    pythonStatus = PythonStatus.MISSING;
-                    try { Thread.sleep(3000); }
-                    catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
-                }
-            }
-            if (closing || python == null) return;
-            pythonStatus = PythonStatus.READY;
+        Thread.ofVirtual().name("mcdr-python-detect").start(this::run);
+    }
+
+    /** Detect Python, then wait for the download decision before touching the shared MCDR directory. */
+    private void run() {
+        SetupCheck check;
+        try {
+            check = awaitSetupDecision();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+        if (check == null || closing) return;
+        if (!check.ready()) {
+            LOGGER.info("MCDR needs installation ({}); waiting for the main menu download", check.reason());
             try {
-                Files.createDirectories(common);
-                Path resources = common.resolve("runtime/bootstrap-resources-0.5.2");
-                extract(resources);
-                List<String> command;
-                if (config.autoInstall) command = new ArrayList<>(List.of(python, resources.resolve("bridge_bootstrap.py").toString(),
-                        "--resources", resources.toString(), "--common", common.toString()));
-                else command = new ArrayList<>(List.of(python, common.resolve("runtime/bridge-runtime/bridge_supervisor.py").toString(), "--common", common.toString()));
-                command.addAll(List.of("--config", gameConfig.toString(), "--state", stateFile.toString(),
-                        "--client-id", clientId, "--parent-pid", Long.toString(ProcessHandle.current().pid())));
-                Files.createDirectories(common.resolve("log"));
-                LOGGER.info("MCDR controller starting; shared directory: {}. Installation progress: bootstrap.log", common);
-                while (!closing) {
-                    Process process = new ProcessBuilder(command).redirectErrorStream(true)
-                            .redirectOutput(ProcessBuilder.Redirect.appendTo(common.resolve("log/bootstrap.log").toFile())).start();
-                    if (!config.autoInstall) installProgress = new InstallProgress("starting", 0);
-                    Path progressFile = stateFile.resolveSibling("install-progress.json");
-                    while (!closing) {
-                        try {
-                            if (Files.isRegularFile(progressFile) && Files.size(progressFile) <= 4096) {
-                                InstallProgress value = InstallProgress.parse(Files.readString(progressFile), clientId);
-                                if (value != null) installProgress = value;
-                            }
-                        } catch (IOException ignored) { /* Retain the last stage during atomic replacement. */ }
-                        if (process.waitFor(500, TimeUnit.MILLISECONDS)) {
-                            if (!closing) installProgress = new InstallProgress(process.exitValue() == 2 ? "waiting_instance" : "failed", 0);
-                            break;
-                        }
-                    }
-                    if (closing || process.exitValue() != 2) break;
-                    Thread.sleep(1000);
-                }
-            } catch (Exception e) {
-                installProgress = new InstallProgress("failed", 0);
-                LOGGER.error("Automatic MCDR installation failed ({})", e.getMessage());
+                installRequested.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
             }
-        });
+            if (closing) return;
+        }
+        startController();
+    }
+
+    /** Poll the installed runtime; Python has to exist before MCDR can be verified or installed. */
+    private SetupCheck awaitSetupDecision() throws InterruptedException {
+        while (!closing) {
+            String python = config.pythonExecutable.isBlank() ? detectPython() : config.pythonExecutable;
+            if (python == null) {
+                pythonStatus = PythonStatus.MISSING;
+                setup.check("");
+                setup.write();
+                Thread.sleep(SETUP_RECHECK_MILLIS);
+                continue;
+            }
+            pythonStatus = PythonStatus.READY;
+            SetupCheck check = probe();
+            setup.check(check.reason());
+            setup.write();
+            if (check.ready() || installRequested.await(SETUP_RECHECK_MILLIS, TimeUnit.MILLISECONDS)) return check;
+        }
+        return null;
+    }
+
+    /**
+     * Report the setup state the menu needs: the published reason is either {@code ready} or the
+     * concrete reason to download. A ready runtime must never also carry a download reason.
+     */
+    private SetupCheck probe() {
+        Path runtimeRoot = common.resolve("runtime");
+        Path environmentPython = runtimeRoot.resolve(".bridge-venv")
+                .resolve(isWindows() ? "Scripts/python.exe" : "bin/python");
+        if (!Files.isRegularFile(environmentPython)) return new SetupCheck(false, "missing");
+        Path marker = runtimeRoot.resolve("runtime-install.json");
+        String installed;
+        try {
+            installed = com.google.gson.JsonParser.parseString(Files.readString(marker))
+                    .getAsJsonObject().get("mcdr").getAsString();
+        } catch (IOException | RuntimeException e) {
+            return new SetupCheck(false, "missing");
+        }
+        if (!EXPECTED_MCDR.equals(installed)) return new SetupCheck(false, "outdated");
+        String reported = mcdrVersion(environmentPython);
+        if (reported == null) return new SetupCheck(false, "broken");
+        return EXPECTED_MCDR.equals(reported)
+                ? new SetupCheck(true, McdrSetup.READY)
+                : new SetupCheck(false, "outdated");
+    }
+
+    /** Ask the isolated environment itself; a half-installed venv answers with a failure exit. */
+    private String mcdrVersion(Path python) {
+        try {
+            Process process = new ProcessBuilder(python.toString(), "-c",
+                    "import importlib.metadata as m; print(m.version('mcdreforged'))").redirectErrorStream(true).start();
+            if (!process.waitFor(6, TimeUnit.SECONDS)) { process.destroyForcibly(); return null; }
+            if (process.exitValue() != 0) return null;
+            String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).strip();
+            return output.lines().reduce((first, last) -> last).orElse(output);
+        } catch (IOException e) {
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
+    }
+
+    private void startController() {
+        try {
+            Files.createDirectories(common);
+            Path resources = common.resolve("runtime/bootstrap-resources-" + bridgeVersion);
+            extract(resources);
+            String python = findPython();
+            if (python == null) {
+                pythonStatus = PythonStatus.MISSING;
+                setup.check("");
+                setup.write();
+                return;
+            }
+            pythonStatus = PythonStatus.READY;
+            List<String> command;
+            if (config.autoInstall) command = new ArrayList<>(List.of(python, resources.resolve("bridge_bootstrap.py").toString(),
+                    "--resources", resources.toString(), "--common", common.toString(), "--expected-mcdr", EXPECTED_MCDR));
+            else command = new ArrayList<>(List.of(python, common.resolve("runtime/bridge-runtime/bridge_supervisor.py").toString(), "--common", common.toString()));
+            command.addAll(List.of("--config", gameConfig.toString(), "--state", stateFile.toString(),
+                    "--client-id", clientId, "--parent-pid", Long.toString(ProcessHandle.current().pid())));
+            Files.createDirectories(common.resolve("log"));
+            LOGGER.info("MCDR controller starting; shared directory: {}. Installation progress: bootstrap.log", common);
+            while (!closing) {
+                Process process = new ProcessBuilder(command).redirectErrorStream(true)
+                        .redirectOutput(ProcessBuilder.Redirect.appendTo(common.resolve("log/bootstrap.log").toFile())).start();
+                if (!config.autoInstall) installProgress = new InstallProgress("starting", 0);
+                Path progressFile = stateFile.resolveSibling("install-progress.json");
+                while (!closing) {
+                    try {
+                        if (Files.isRegularFile(progressFile) && Files.size(progressFile) <= 4096) {
+                            InstallProgress value = InstallProgress.parse(Files.readString(progressFile), clientId);
+                            if (value != null) installProgress = value;
+                        }
+                    } catch (IOException ignored) { /* Retain the last stage during atomic replacement. */ }
+                    if (process.waitFor(500, TimeUnit.MILLISECONDS)) {
+                        if (!closing) installProgress = new InstallProgress(process.exitValue() == 2 ? "waiting_instance" : "failed", 0);
+                        break;
+                    }
+                }
+                if (closing || process.exitValue() != 2) break;
+                Thread.sleep(1000);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (Exception e) {
+            installProgress = new InstallProgress("failed", 0);
+            LOGGER.error("Automatic MCDR installation failed ({})", e.getMessage());
+        }
     }
 
     private void extract(Path destination) throws IOException {
@@ -170,6 +286,28 @@ final class AutoRuntime {
                 }
             }
         }
+    }
+
+    private static boolean isWindows() {
+        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("windows");
+    }
+
+    /**
+     * Development builds share the stable materials folder of the release they belong to, so a
+     * locally built jar reuses the materials a published build already extracted.
+     */
+    private static String stableVersion(String version) {
+        int development = version.indexOf("-dev.");
+        return development > 0 ? version.substring(0, development) : version;
+    }
+
+    /** Repeating the full search keeps a later Python installation from requiring a game restart. */
+    private String detectPython() {
+        String python = findPython();
+        if (python == null && pythonStatus != PythonStatus.MISSING) {
+            LOGGER.info("Python 3.10 or newer with pip was not found; waiting for installation");
+        }
+        return python;
     }
 
     private String findPython() {

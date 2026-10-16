@@ -9,6 +9,10 @@ record InstallProgress(String stage, int attempt) {
             "config", "plugins", "waiting_instance", "starting", "ready", "failed");
 
     boolean running() { return !stage.equals("ready") && !stage.equals("failed"); }
+
+    /** True only while MCDR is really being installed; startup stages are not installation work. */
+    boolean installing() { return running() && !stage.equals("starting") && !stage.equals("waiting_instance"); }
+
     String translationKey() { return "mcdr-singleplayer.install.stage." + stage; }
 
     static InstallProgress parse(String data, String clientId) {
@@ -22,19 +26,11 @@ record InstallProgress(String stage, int attempt) {
         } catch (RuntimeException ignored) { return null; }
     }
 
-    /** One dismissible window per world, with stage changes and slow-install reminders in chat. */
+    /** Chat feedback only: the installer window is a menu-time prompt and never opens inside a world. */
     static final class Feedback {
-        private boolean shown;
         private boolean finished;
         private InstallProgress announced;
         private long lastAnnouncement;
-
-        boolean shouldOpen(InstallProgress value, boolean available) {
-            if (finished || value.stage().equals("ready")) { shown = true; return false; }
-            if (shown || !available) return false;
-            shown = true;
-            return true;
-        }
 
         boolean shouldAnnounce(InstallProgress value, long now) {
             if (finished && !value.stage().equals("failed")) return false;
@@ -48,6 +44,14 @@ record InstallProgress(String stage, int attempt) {
                 return true;
             }
             return false;
+        }
+
+        /**
+         * Chat may only narrate real installation work. A controller that is starting or waiting for
+         * another client is not progress inside a world, so it must not repeat on a timer.
+         */
+        boolean shouldAnnounceInstallation(InstallProgress value, long now) {
+            return (value.installing() || value.stage().equals("failed")) && shouldAnnounce(value, now);
         }
     }
 }
