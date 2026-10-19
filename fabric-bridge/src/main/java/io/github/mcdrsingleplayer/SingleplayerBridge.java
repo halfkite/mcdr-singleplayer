@@ -277,8 +277,9 @@ public final class SingleplayerBridge implements ModInitializer {
      */
     private void registerMenuButton() {
         net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.AFTER_INIT.register((client, screen, width, height) -> {
+            LOGGER.info("Title screen event: screen={} size={}x{}", screen.getClass().getSimpleName(), width, height);
             if (!(screen instanceof TitleScreen)) return;
-            MenuIconButton button = new MenuIconButton(0, 0, 20, 20, pressed -> openMcdrSetup(client, false));
+            MenuIconButton button = new MenuIconButton(0, 0, 20, pressed -> openMcdrSetup(client, false));
             button.visible = runtime != null;
             net.fabricmc.fabric.api.client.screen.v1.Screens.getWidgets(screen).add(button);
             button.refresh();
@@ -308,6 +309,9 @@ public final class SingleplayerBridge implements ModInitializer {
             }
         }
         MenuButtonPlacement.Position position = MenuButtonPlacement.place(boxes, own, replay, screenWidth, screenHeight);
+        // Release checks and the client test harness read this line to confirm the entry was placed.
+        LOGGER.info("Menu entry placement: screen={}x{} widgets={} replay={} chosen={}", screenWidth,
+                screenHeight, widgets.size(), replay == null ? "absent" : replay, position);
         if (position != null) button.setPosition(position.x(), position.y());
     }
 

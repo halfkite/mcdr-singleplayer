@@ -4,6 +4,7 @@ Generated projects live below build/matrix; canonical sources are never rewritte
 """
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -74,6 +75,11 @@ def legacy_overlay(text, game):
     return text
 
 
+def _blit_without_pipeline(text: str) -> str:
+    """Drop the render-pipeline argument; before 26.x the textured blit has none."""
+    return text.replace('graphics.blit(RenderPipelines.GUI_TEXTURED, ICON,', 'graphics.blit(ICON,')
+
+
 def adapt_java(text, name, row, loader):
     game = row['minecraft']
     parts = tuple(map(int, game.split('.')))
@@ -93,21 +99,41 @@ def adapt_java(text, name, row, loader):
         text = text.replace('getInstance().gui.setScreen(', 'getInstance().setScreen(')
         # Fabric renamed the title-screen widget accessor when screens moved to render states.
         text = text.replace('Screens.getWidgets(', 'Screens.getButtons(')
-        if 'FontDescription' in text:
-            # 26.x wraps a named font in FontDescription; older Style takes the resource directly.
+        if 'FontDescription' in text and parts < (1, 21, 9):
+            # 1.21.9 keeps the FontDescription wrapper; older Style takes the resource directly.
             text = text.replace('new net.minecraft.network.chat.FontDescription.Resource(', '(')
-        if 'mcdr-singleplayer:icon' in text:
+            text = text.replace('new FontDescription.Resource(', '(')
+            text = text.replace('import net.minecraft.network.chat.FontDescription;\n', '')
+        # Identifier only exists from 1.21.11 onwards; every earlier version calls it ResourceLocation.
+        if parts < (1, 21, 11):
             text = text.replace('net.minecraft.resources.Identifier', 'net.minecraft.resources.ResourceLocation')
+        if name == 'MenuIconButton.java':
+            # The label is a plain literal, so the only version differences are the abstract render
+            # method 26.x/1.21.11 require and the resource type rename in 1.21.11.
+            if not extracted:
+                # Older widgets paint through one of two render methods; the icon drawing itself is
+                # shared because fill() has the same signature everywhere.
+                text = text.replace('GuiGraphicsExtractor', 'GuiGraphics')
+                text = text.replace('import net.minecraft.client.gui.components.Button;',
+                                    'import net.minecraft.client.gui.GuiGraphics;\n'
+                                    'import net.minecraft.client.gui.components.Button;')
+                if late:
+                    # 1.21.11 splits the button into renderWidget (final) calling the abstract
+                    # renderContents, so calling the super implementation would re-enter this
+                    # override forever. renderDefaultSprite paints the vanilla frame instead.
+                    text = text.replace(
+                        'protected void extractContents(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {',
+                        'protected void renderContents(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {')
+                    text = text.replace('extractDefaultSprite(graphics);', 'renderDefaultSprite(graphics);')
+                else:
+                    text = text.replace(
+                        'protected void extractContents(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {',
+                        'protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {')
+                    text = text.replace('extractDefaultSprite(graphics);',
+                                        'super.renderWidget(graphics, mouseX, mouseY, partialTick);')
         if name in ('RestoreTitleScreenMixin.java', 'PythonSetupScreen.java', 'McdrSetupScreen.java'):
             text = text.replace('GuiGraphicsExtractor', 'GuiGraphics').replace('extractRenderState', 'render')
             text = text.replace('graphics.centeredText', 'graphics.drawCenteredString')
-        if name == 'MenuIconButton.java':
-            # Older versions draw widgets through the pre-extraction render method and take an
-            # explicit pipeline argument for textured blits.
-            text = text.replace('GuiGraphicsExtractor', 'GuiGraphics')
-            text = text.replace('extractContents', 'renderWidget')
-            text = text.replace('RenderPipelines.GUI_TEXTURED, ICON,', 'ICON,')
-            text = text.replace('ICON_SIZE, ICON_SIZE, 0xffffffff)', 'ICON_SIZE, ICON_SIZE)')
         if name == 'RestoreBackupSelectionScreen.java':
             text = text.replace('GuiGraphicsExtractor', 'GuiGraphics').replace('extractRenderState', 'render')
             text = text.replace('graphics.centeredText', 'graphics.drawCenteredString')

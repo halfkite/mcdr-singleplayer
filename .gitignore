@@ -16,3 +16,4 @@ docs/assets/
 docs/*测试记录*.md
 docs/*兼容性与发布*.md
 docs/项目指令.md
+.client-tests/

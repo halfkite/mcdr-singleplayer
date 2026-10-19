@@ -2,9 +2,33 @@
 from pathlib import Path
 
 
+def _bind_screens(text: str, fully_qualified_import: bool = False) -> str:
+    """Swap Fabric's screen API for the NeoForge binding and make sure it is imported."""
+    text = text.replace('net.fabricmc.fabric.api.client.screen.v1.', '')
+    # Fabric renamed the accessor for pre-26.1; NeoScreens only exposes getWidgets.
+    text = text.replace('getButtons(', 'getWidgets(')
+    text = text.replace('ScreenEvents.', 'NeoScreens.').replace('Screens.', 'NeoScreens.')
+    # Replacing ScreenEvents first must not alter the new NeoScreens prefix twice.
+    text = text.replace('NeoNeoScreens', 'NeoScreens')
+    if 'NeoScreens' not in text:
+        return text
+    package = text.split('package ', 1)[1].split(';', 1)[0].strip()
+    import_line = ('import ' + package + '.NeoScreens;\n') if fully_qualified_import else 'import NeoScreens;\n'
+    if import_line in text:
+        return text
+    for anchor in ('\n\n/**', '\n\nfinal class', '\n\npublic final class'):
+        if anchor in text:
+            return text.replace(anchor, '\n\n' + import_line + anchor[2:], 1)
+    return import_line + text
+
+
 def adapt(text, name, row):
     text = '\n'.join(line for line in text.splitlines() if not line.startswith('import net.fabricmc.')) + '\n'
     if name == 'SingleplayerBridge.java':
+        # NeoForge has no Fabric screen API: NeoScreens binds ScreenEvent.Init.Post and re-adds
+        # widgets through the event, so the title-screen entry only needs the name swap. The import
+        # carries the variant package, so it stays correct in both the single-version and merged jars.
+        text = _bind_screens(text, fully_qualified_import=True)
         text = text.replace('public final class SingleplayerBridge implements ModInitializer', 'public final class SingleplayerBridge')
         text = text.replace('    @Override\n    public void onInitialize()', '    public void onInitialize()')
         text = text.replace('import org.slf4j.Logger;', '''import net.minecraft.commands.CommandSourceStack;
@@ -68,9 +92,7 @@ import com.google.gson.JsonArray;''')
                     owned.forEach(suggestions::remove);
                 }''')
     elif name == 'RestoreTitleOverlay.java':
-        text = text.replace('ScreenEvents.', 'NeoScreens.').replace('Screens.', 'NeoScreens.')
-        # Replacing ScreenEvents first must not alter the new NeoScreens prefix twice.
-        text = text.replace('NeoNeoScreens', 'NeoScreens')
+        text = _bind_screens(text, fully_qualified_import=True)
     return text
 
 
@@ -102,6 +124,26 @@ public final class NeoPlatform {
         public static Loader getInstance() { return new Loader(); }
         public java.nio.file.Path getGameDir() { return net.neoforged.fml.loading.FMLPaths.GAMEDIR.get(); }
         public boolean isModLoaded(String id) { return net.neoforged.fml.ModList.get().isLoaded(id); }
+        /** Mirrors FabricLoader.getModContainer so the shared call chain keeps working. */
+        public java.util.Optional<ModContainer> getModContainer(String id) {
+            return net.neoforged.fml.ModList.get().getModContainerById(id).map(ModContainer::new);
+        }
+    }
+    /** The single piece of mod metadata the shared code reads: the friendly version string. */
+    public static final class ModContainer {
+        private final net.neoforged.fml.ModContainer delegate;
+        ModContainer(net.neoforged.fml.ModContainer delegate) { this.delegate = delegate; }
+        public Metadata getMetadata() { return new Metadata(delegate.getModInfo().getVersion().toString()); }
+    }
+    public static final class Metadata {
+        private final String version;
+        Metadata(String version) { this.version = version; }
+        public Version getVersion() { return new Version(version); }
+    }
+    public static final class Version {
+        private final String value;
+        Version(String value) { this.value = value; }
+        public String getFriendlyString() { return value; }
     }
     static void started(Consumer<Minecraft> action) {
         NeoForge.EVENT_BUS.addListener(new Consumer<ClientTickEvent.Post>() {
