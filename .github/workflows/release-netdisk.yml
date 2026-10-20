@@ -1,0 +1,169 @@
+name: Upload mcdr-singleplayer to 123pan
+
+run-name: Publish ${{ github.event.release.tag_name || inputs.tag }} to 123pan
+
+# Mirrors the halfmasa release pipeline: the published Release JARs are copied to the 123pan WebDAV
+# folder named after the tag, then verified with rclone. The build jobs stay in release.yml and
+# release-neoforge.yml, so this workflow only waits for their assets to appear.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing published Release tag (for example 0.6.0)'
+        required: true
+        type: string
+      include_prerelease:
+        description: 'Also upload a Release marked as pre-release'
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: netdisk-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    name: Copy Release JARs to 123pan
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Reject missing tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$RELEASE_TAG" ]]; then
+            echo 'Release tag is empty' >&2
+            exit 1
+          fi
+
+      - name: Skip pre-release unless requested
+        id: gate
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          IS_PRERELEASE: ${{ github.event.release.prerelease }}
+          INCLUDE_PRERELEASE: ${{ inputs.include_prerelease }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == 'release' && "$IS_PRERELEASE" == 'true' ]]; then
+            if [[ "$INCLUDE_PRERELEASE" != 'true' ]]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "Release $RELEASE_TAG is a pre-release; set include_prerelease to upload it." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the released tag
+        if: ${{ steps.gate.outputs.skip == 'false' }}
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          fetch-depth: 1
+
+      - name: Check the tag matches the declared version
+        if: ${{ steps.gate.outputs.skip == 'false' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          declared=$(python3 -c "import json;print(json.load(open('compat/versions.json'))['modVersion'])")
+          if [[ "${RELEASE_TAG#v}" != "$declared" ]]; then
+            echo "Tag ${RELEASE_TAG} does not match compat/versions.json version $declared" >&2
+            exit 1
+          fi
+
+      - name: Wait for the release workflows to attach all four JARs
+        if: ${{ steps.gate.outputs.skip == 'false' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The loader workflows build in parallel, so the assets appear over several minutes; four
+          # family JARs is the complete set they are expected to publish.
+          for attempt in $(seq 1 45); do
+            count=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --json assets --jq '[.assets[].name | select(endswith(".jar"))] | length')
+            echo "attempt $attempt: $count jar(s) attached"
+            if [[ "$count" -ge 4 ]]; then
+              break
+            fi
+            if [[ "$attempt" -eq 45 ]]; then
+              echo "Timed out waiting for the four Release JARs" >&2
+              gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' >&2
+              exit 1
+            fi
+            sleep 60
+          done
+
+      - name: Download the Release JARs
+        if: ${{ steps.gate.outputs.skip == 'false' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-jars
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern '*.jar' --dir release-jars
+          ls -l release-jars
+          count=$(find release-jars -maxdepth 1 -name '*.jar' | wc -l)
+          if [[ "$count" -lt 4 ]]; then
+            echo "Expected four family JARs, downloaded $count" >&2
+            exit 1
+          fi
+
+      - name: Install rclone
+        if: ${{ steps.gate.outputs.skip == 'false' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes rclone
+
+      - name: Copy and verify the JARs in the tag folder
+        if: ${{ steps.gate.outputs.skip == 'false' }}
+        shell: bash
+        env:
+          WEBDAV_USER: ${{ secrets.PAN123_WEBDAV_USERNAME }}
+          WEBDAV_PASSWORD: ${{ secrets.PAN123_WEBDAV_PASSWORD }}
+          RCLONE_CONFIG_WEBDAV123_TYPE: webdav
+          RCLONE_CONFIG_WEBDAV123_URL: https://webdav.123pan.cn/webdav
+          RCLONE_CONFIG_WEBDAV123_VENDOR: other
+        run: |
+          set -euo pipefail
+          if [[ -z "$WEBDAV_USER" || -z "$WEBDAV_PASSWORD" ]]; then
+            echo 'Configure PAN123_WEBDAV_USERNAME and PAN123_WEBDAV_PASSWORD repository secrets.' >&2
+            exit 1
+          fi
+
+          export RCLONE_CONFIG_WEBDAV123_USER="$WEBDAV_USER"
+          export RCLONE_CONFIG_WEBDAV123_PASS="$(rclone obscure "$WEBDAV_PASSWORD")"
+          unset WEBDAV_PASSWORD
+
+          # The WebDAV credential is scoped to the user's authorized folder; this release's JARs go
+          # into a child folder named after the Release tag, exactly like the halfmasa pipeline.
+          rclone copy release-jars "webdav123:$RELEASE_TAG" \
+            --include '*.jar' \
+            --ignore-times \
+            --stats-one-line
+
+          rclone check release-jars "webdav123:$RELEASE_TAG" \
+            --include '*.jar' \
+            --one-way
+
+      - name: Summarise
+        if: ${{ steps.gate.outputs.skip == 'false' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "### 123pan"
+            echo
+            echo "Uploaded the Release JARs of \`$RELEASE_TAG\` to the 123pan folder \`$RELEASE_TAG\`."
+            echo
+            find release-jars -maxdepth 1 -name '*.jar' -printf '- %f\n' | sort
+          } >> "$GITHUB_STEP_SUMMARY"
