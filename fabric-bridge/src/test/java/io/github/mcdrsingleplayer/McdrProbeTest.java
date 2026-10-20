@@ -71,7 +71,12 @@ class McdrProbeTest {
 
     private static Path environment(Path game) throws Exception {
         Path common = game.resolve("mcdr-singleplayer");
-        Path python = common.resolve("runtime/.bridge-venv/Scripts/python.exe");
+        // The probe looks for the interpreter where each platform keeps it, so the fixture has to
+        // create the same path or the test only passes on Windows.
+        boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT)
+                .contains("windows");
+        Path python = common.resolve("runtime/.bridge-venv")
+                .resolve(windows ? "Scripts/python.exe" : "bin/python");
         Files.createDirectories(python.getParent());
         Files.writeString(python, "");
         return common;
