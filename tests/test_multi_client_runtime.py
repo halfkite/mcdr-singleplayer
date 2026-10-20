@@ -96,3 +96,22 @@ def test_only_lan_host_is_automatically_promoted(tmp_path):
     permissions = yaml.load((tmp_path / 'permission.yml').read_text(encoding='utf8'))
     assert permissions['owner'] == ['Host']
     assert permissions['user'] == ['LanGuest']
+
+
+def test_a_zero_filled_permission_file_does_not_stop_the_controller(tmp_path):
+    """A crash or a full disk can leave the file full of NUL bytes, which is not valid YAML."""
+    from ruamel.yaml import YAML
+    yaml = YAML()
+    (tmp_path / 'permission.yml').write_bytes(b'\x00' * 64)
+    (tmp_path / 'config.yml').write_bytes(b'\x00' * 64)
+
+    supervisor.configure_host(tmp_path, 'Host', 'zh_cn')
+
+    permissions = yaml.load((tmp_path / 'permission.yml').read_text(encoding='utf8'))
+    assert permissions['owner'] == ['Host']
+    backups = list((tmp_path / 'runtime/history').iterdir())
+    assert any(name.name.startswith('permission.yml.corrupt-') for name in backups)
+    assert any(name.name.startswith('config.yml.corrupt-') for name in backups)
+    # config.yml is MCDR's own file: it is moved aside so MCDR rewrites its defaults.
+    assert not (tmp_path / 'config.yml').exists()
+

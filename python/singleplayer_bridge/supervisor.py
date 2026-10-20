@@ -17,8 +17,11 @@ def configure_host(common, player, language):
     yaml = YAML()
     for filename in ('permission.yml', 'config.yml'):
         path = Path(common) / filename
-        with path.open(encoding='utf8') as stream:
-            config = yaml.load(stream)
+        config = _load_or_default(path, filename, yaml)
+        if config is None:
+            # config.yml is MCDR's own file: a damaged copy is moved aside and MCDR rewrites the
+            # defaults on the next start, which is safer than guessing at its contents.
+            continue
         changed = False
         if filename == 'permission.yml' and re.fullmatch(r'[A-Za-z0-9_]{1,16}', player):
             for key in ('guest', 'user', 'helper', 'admin', 'owner'):
@@ -45,6 +48,41 @@ def configure_host(common, player, language):
             with temporary.open('w', encoding='utf8') as stream:
                 yaml.dump(config, stream)
             temporary.replace(path)
+
+
+def _load_or_default(path, filename, yaml):
+    """Load a YAML file, replacing one that cannot be parsed.
+
+    A zero-filled or truncated file (an interrupted write, a crash, a full disk) used to raise out
+    of the controller's tick and stop MCDR for the whole session. The damaged copy is kept under
+    runtime/history for diagnosis, and the caller continues with a usable document. MCDR's own
+    config.yml is removed so it writes fresh defaults; permission.yml is rebuilt from scratch here
+    because MCDR would otherwise keep failing on the same file.
+    """
+    import shutil
+    try:
+        with path.open(encoding='utf8') as stream:
+            data = yaml.load(stream)
+        return data if isinstance(data, dict) else None
+    except FileNotFoundError:
+        return None
+    except Exception as error:  # noqa: BLE001 - any unreadable file must not stop the controller
+        history = Path(path).parent / 'runtime/history' / f'{Path(path).name}.corrupt-{time.time_ns()}'
+        history.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.copy2(path, history)
+        except OSError:
+            pass
+        logging.getLogger('singleplayer_bridge').warning(
+            '%s 无法解析（%s），已备份到 %s', Path(path).name, error.__class__.__name__, history)
+        if filename != 'permission.yml':
+            try:
+                Path(path).unlink()
+            except OSError:
+                pass
+            return None
+        # The owner is added by the caller, so the document starts empty and gets written back.
+        return {'guest': [], 'user': [], 'helper': [], 'admin': [], 'owner': []}
 
 
 class Controller:
