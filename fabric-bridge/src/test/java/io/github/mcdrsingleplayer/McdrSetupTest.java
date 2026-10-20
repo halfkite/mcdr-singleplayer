@@ -90,6 +90,20 @@ class McdrSetupTest {
         assertEquals(McdrSetupScreen.Status.READY, SingleplayerBridge.setupStatus(setup, progress("ready")));
     }
 
+    @Test void aMissingPythonIsOfferedFromTheMenuInsteadOfOnlyInAWorld() {
+        var setup = new McdrSetup(Path.of("setup-status.json"));
+        setup.check(McdrSetup.PYTHON_MISSING);
+        assertTrue(setup.actionNeeded(), "The menu has to offer help when Python is missing");
+        assertEquals(McdrSetup.PYTHON_MISSING, setup.reason());
+        assertEquals(McdrSetupScreen.Status.NEEDS_PYTHON,
+                SingleplayerBridge.setupStatus(setup, progress("preparing")));
+
+        // Once Python appears the same window turns into the ordinary MCDR download.
+        setup.check("missing");
+        assertEquals(McdrSetupScreen.Status.NEEDS_INSTALL,
+                SingleplayerBridge.setupStatus(setup, progress("preparing")));
+    }
+
     private static InstallProgress progress(String stage) {
         return new InstallProgress(stage, 0);
     }

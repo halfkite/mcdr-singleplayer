@@ -196,6 +196,8 @@
   "mcdr-singleplayer.setup.installing": "正在下載並安裝 MCDR\n可以關閉本視窗，安裝會在背景繼續\n安裝完成後進入單人存檔即可使用 MCDR 指令",
   "mcdr-singleplayer.setup.failed": "MCDR 安裝或啟動失敗\n請查看 mcdr-singleplayer/log 下的日誌\n解決問題後可在主選單重新開啟本介面重試",
   "mcdr-singleplayer.setup.download": "立即下載 MCDR",
+  "mcdr-singleplayer.setup.python_missing": "未偵測到 Python\nMCDR 需要 Python 3.10 或更新版本並包含 pip\n安裝後本視窗會自動繼續，無需重新啟動遊戲",
+  "mcdr-singleplayer.setup.python_download": "下載 Python",
   "mcdr-singleplayer.setup.close": "稍後",
   "mcdr-singleplayer.setup.escape_hint": "按 Esc 關閉，可隨時用主選單原版按鈕列右側的模組圖示按鈕重新開啟",
   "mcdr-singleplayer.setup.menu_hint": "[mcdr-singleplayer] MCDR 尚未準備完成，可在主選單原版按鈕列右側的模組圖示按鈕下載或更新（關閉本提示不會開始下載）",

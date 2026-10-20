@@ -12,13 +12,14 @@ import net.minecraft.network.chat.Component;
  */
 final class McdrSetupScreen extends Screen {
     /** What the menu shows; the runtime is prepared while no save is open, never for one world. */
-    enum Status { CHECKING, READY, INSTALLING, FAILED, NEEDS_INSTALL }
+    enum Status { CHECKING, READY, INSTALLING, FAILED, NEEDS_INSTALL, NEEDS_PYTHON }
 
     record View(Status status, String reason, InstallProgress progress) { }
 
     interface Behaviour {
         View view();
         void install();
+        void openPython();
         void dismiss();
     }
 
@@ -34,13 +35,19 @@ final class McdrSetupScreen extends Screen {
         int buttonWidth = Math.min(200, width - 40);
         int center = (width - buttonWidth) / 2;
         Status status = behaviour.view().status();
+        boolean needsPython = status == Status.NEEDS_PYTHON;
         boolean downloadable = status == Status.NEEDS_INSTALL || status == Status.FAILED;
+        if (needsPython) {
+            addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.setup.python_download"),
+                    button -> behaviour.openPython()).bounds(center, height - 56, buttonWidth, 20).build());
+        }
         if (downloadable) {
             addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.setup.download"),
                     button -> behaviour.install()).bounds(center, height - 56, buttonWidth, 20).build());
         }
+        boolean hasPrimary = needsPython || downloadable;
         addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.setup.close"), button -> onClose())
-                .bounds(center, downloadable ? height - 32 : height - 48, buttonWidth, 20).build());
+                .bounds(center, hasPrimary ? height - 32 : height - 48, buttonWidth, 20).build());
     }
 
     @Override
@@ -83,6 +90,7 @@ final class McdrSetupScreen extends Screen {
         }
         if (view.status() == Status.FAILED) return "mcdr-singleplayer.setup.failed";
         return switch (view.reason()) {
+            case McdrSetup.PYTHON_MISSING -> "mcdr-singleplayer.setup.python_missing";
             case "missing" -> "mcdr-singleplayer.setup.missing";
             case "outdated" -> "mcdr-singleplayer.setup.outdated";
             case "broken" -> "mcdr-singleplayer.setup.broken";

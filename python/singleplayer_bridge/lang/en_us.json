@@ -196,6 +196,8 @@
   "mcdr-singleplayer.setup.installing": "Downloading and installing MCDR\nYou may close this window; installation continues in the background\nMCDR commands become available when you enter a singleplayer world",
   "mcdr-singleplayer.setup.failed": "MCDR installation or startup failed\nCheck the logs under mcdr-singleplayer/log\nAfter fixing the cause, reopen this screen from the main menu to retry",
   "mcdr-singleplayer.setup.download": "Download MCDR now",
+  "mcdr-singleplayer.setup.python_missing": "Python was not found\nMCDR needs Python 3.10 or newer with pip\nThis window continues automatically once it is installed",
+  "mcdr-singleplayer.setup.python_download": "Download Python",
   "mcdr-singleplayer.setup.close": "Later",
   "mcdr-singleplayer.setup.escape_hint": "Press Esc to close; reopen this screen anytime with the mod icon button in the vanilla menu button row",
   "mcdr-singleplayer.setup.menu_hint": "[mcdr-singleplayer] MCDR is not ready yet; download or update it with the mod icon button in the vanilla menu button row (closing this notice does not start any download)",

@@ -241,6 +241,16 @@ public final class SingleplayerBridge implements ModInitializer {
                 client.gui.setScreen(null);
             }
 
+            /**
+             * Python is a prerequisite the mod cannot install, so the prompt hands over to the page
+             * that has the official links instead of starting a download that would fail.
+             */
+            @Override public void openPython() {
+                client.gui.setScreen(new PythonSetupScreen(() -> {
+                    if (dismissAfterClose) mcdrSetupPromptDismissed = true;
+                }));
+            }
+
             @Override public void dismiss() {
                 if (dismissAfterClose) mcdrSetupPromptDismissed = true;
             }
@@ -261,6 +271,7 @@ public final class SingleplayerBridge implements ModInitializer {
         if (setup == null) return McdrSetupScreen.Status.CHECKING;
         String reason = setup.reason();
         if (McdrSetup.READY.equals(reason)) return McdrSetupScreen.Status.READY;
+        if (McdrSetup.PYTHON_MISSING.equals(reason)) return McdrSetupScreen.Status.NEEDS_PYTHON;
         if (setup.running()) {
             if (progress.stage().equals("failed")) return McdrSetupScreen.Status.FAILED;
             // The controller reaches this stage with MCDR fully prepared and waiting for a world.

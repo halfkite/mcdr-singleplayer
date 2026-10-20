@@ -157,13 +157,31 @@ final class AutoRuntime {
         startController();
     }
 
+    /**
+     * Whether a configured interpreter is actually there; a bare command name is left to the
+     * detector, which already resolved it before it reached the configuration.
+     */
+    private boolean pythonUsable(String python) {
+        try {
+            Path path = Path.of(python);
+            return !path.isAbsolute() && !python.contains("/") && !python.contains("\\")
+                    || Files.isRegularFile(path);
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
     /** Poll the installed runtime; Python has to exist before MCDR can be verified or installed. */
     private SetupCheck awaitSetupDecision() throws InterruptedException {
         while (!closing) {
             String python = config.pythonExecutable.isBlank() ? detectPython() : config.pythonExecutable;
-            if (python == null) {
+            // A configured path that no longer exists is just as unusable as a missing interpreter,
+            // and reporting it from the menu keeps the world from pausing over it later.
+            if (python == null || !pythonUsable(python)) {
                 pythonStatus = PythonStatus.MISSING;
-                setup.check("");
+                // A published reason is what makes the main menu offer help, so a missing Python is
+                // reported there instead of waiting for the player to open a world.
+                setup.check(McdrSetup.PYTHON_MISSING);
                 setup.write();
                 Thread.sleep(SETUP_RECHECK_MILLIS);
                 continue;

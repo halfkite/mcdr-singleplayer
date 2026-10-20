@@ -12,6 +12,8 @@ import java.nio.file.StandardCopyOption;
  */
 final class McdrSetup {
     static final String READY = "ready";
+    /** Python itself is missing, so MCDR cannot be installed until the player installs it. */
+    static final String PYTHON_MISSING = "python";
 
     private final Path statusFile;
     private volatile String published = "";
