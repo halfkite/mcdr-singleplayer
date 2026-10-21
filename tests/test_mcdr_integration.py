@@ -15,6 +15,8 @@ from ruamel.yaml import YAML
 from singleplayer_bridge.protocol import encode_frame, read_frame
 
 ROOT = Path(__file__).resolve().parents[1]
+# Read the declared version instead of hardcoding it, so a release bump does not break the test.
+BRIDGE_VERSION = json.loads((ROOT / 'python/mcdreforged.plugin.json').read_text(encoding='utf8'))['version']
 
 
 def pack_plugin(target):
@@ -128,7 +130,7 @@ def on_server_stop(server, code):
                 assert sum(item.get('join') == 'Steve' for item in entries) == 1
                 process.stdin.write('!!MCDR permission set Steve owner\n!!MCDR plugin reload singleplayer_bridge\n')
                 process.stdin.flush()
-                wait_until(lambda: 'Plugin singleplayer_bridge@0.6.0 reloaded' in log_path.read_text(encoding='utf8'))
+                wait_until(lambda: f'Plugin singleplayer_bridge@{BRIDGE_VERSION} reloaded' in log_path.read_text(encoding='utf8'))
                 connection.sendall(encode_frame(dict(type='chat', session='world-1', player='Steve', text='!!spbridge status')))
                 status = receive()
                 assert '26.3' in status['command'] and '世界' in status['command']

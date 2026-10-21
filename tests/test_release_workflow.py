@@ -70,15 +70,16 @@ def test_loader_version_guards_reject_a_stale_declaration(tmp_path):
         shutil.copytree(check_release.ROOT / name, tmp_path / name, dirs_exist_ok=True,
                         ignore=shutil.ignore_patterns('__pycache__', 'build', 'logs', 'run'))
     shutil.copy2(check_release.ROOT / 'requirements-prime-backup.txt', tmp_path / 'requirements-prime-backup.txt')
-    assert check_release.declared_bridge_version(tmp_path) == check_release.declared_bridge_version()
+    current = check_release.declared_bridge_version()
+    assert check_release.declared_bridge_version(tmp_path) == current
     properties = tmp_path / 'fabric-bridge/gradle.properties'
-    properties.write_text(properties.read_text(encoding='utf8').replace('version=0.6.0', 'version=0.5.2'), encoding='utf8')
+    properties.write_text(properties.read_text(encoding='utf8').replace(f'version={current}', 'version=0.5.2'), encoding='utf8')
     with pytest.raises(SystemExit, match='BUNDLED_VERSION'):
         check_release.declared_bridge_version(tmp_path)
     plugin = tmp_path / 'python/mcdreforged.plugin.json'
-    plugin.write_text(plugin.read_text(encoding='utf8').replace('"0.6.0"', '"0.5.0"'), encoding='utf8')
-    properties.write_text(properties.read_text(encoding='utf8').replace('version=0.5.2', 'version=0.6.0'), encoding='utf8')
-    with pytest.raises(SystemExit, match='expected 0.6.0'):
+    plugin.write_text(plugin.read_text(encoding='utf8').replace(f'"{current}"', '"0.5.0"'), encoding='utf8')
+    properties.write_text(properties.read_text(encoding='utf8').replace('version=0.5.2', f'version={current}'), encoding='utf8')
+    with pytest.raises(SystemExit, match=f'expected {current}'):
         check_release.declared_bridge_version(tmp_path)
 
 

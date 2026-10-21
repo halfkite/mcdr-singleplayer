@@ -1,5 +1,6 @@
 """Two saves, real MCDR loader and stock PB, one shared config/plugins/permissions."""
 import hashlib
+import json
 import os
 import shutil
 import socket
@@ -14,6 +15,9 @@ from singleplayer_bridge.protocol import encode_frame, read_frame
 from singleplayer_bridge.supervisor import Controller
 
 ROOT = Path(__file__).resolve().parents[1]
+# Read the declared version instead of hardcoding it, so a release bump does not break the test.
+ADAPTER_VERSION = json.loads(
+    (ROOT / 'prime-backup-adapter/mcdreforged.plugin.json').read_text(encoding='utf8'))['version']
 
 
 def wait(predicate, timeout=20):
@@ -87,7 +91,7 @@ def on_load(server, previous):
             expected = 2 if index == 2 else 1
             wait(lambda: read_json(profile / 'config/profile_probe/state.json')['loads'] == expected)
             log = common / 'log' / profile.name / 'controller-child.log'
-            wait(lambda: 'singleplayer_prime_backup@0.6.0 loaded' in log.read_text(encoding='utf8'))
+            wait(lambda: f'singleplayer_prime_backup@{ADAPTER_VERSION} loaded' in log.read_text(encoding='utf8'))
             assert (common / 'log' / profile.name / 'MCDR.log').is_file()
             assert 'Fail to load' not in log.read_text(encoding='utf8')
             if index == 0:
