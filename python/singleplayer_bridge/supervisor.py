@@ -48,6 +48,32 @@ def configure_host(common, player, language):
             with temporary.open('w', encoding='utf8') as stream:
                 yaml.dump(config, stream)
             temporary.replace(path)
+            if filename == 'permission.yml':
+                # Keep the version that just parsed and wrote cleanly, so a later corruption can be
+                # repaired from real data instead of falling back to an empty permission list.
+                _remember_good(path)
+
+
+def _write_yaml(path, data, yaml):
+    """Replace the file atomically so a reader never sees a half-written document."""
+    temporary = Path(path).with_suffix(Path(path).suffix + '.tmp')
+    with temporary.open('w', encoding='utf8') as stream:
+        yaml.dump(data, stream)
+    temporary.replace(Path(path))
+
+
+def _good_copy(path):
+    return Path(path).parent / 'runtime/history' / 'permission.yml.last-good'
+
+
+def _remember_good(path):
+    import shutil
+    try:
+        target = _good_copy(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, target)
+    except OSError:
+        pass
 
 
 def _load_or_default(path, filename, yaml):
@@ -63,7 +89,17 @@ def _load_or_default(path, filename, yaml):
     try:
         with path.open(encoding='utf8') as stream:
             data = yaml.load(stream)
-        return data if isinstance(data, dict) else None
+        if not isinstance(data, dict):
+            return None
+        if filename == 'permission.yml':
+            # Remember what parsed cleanly; that copy is what a later corruption is repaired from.
+            good = _good_copy(path)
+            try:
+                if not good.is_file() or good.stat().st_size != Path(path).stat().st_size:
+                    shutil.copy2(path, good)
+            except OSError:
+                pass
+        return data
     except FileNotFoundError:
         return None
     except Exception as error:  # noqa: BLE001 - any unreadable file must not stop the controller
@@ -81,8 +117,33 @@ def _load_or_default(path, filename, yaml):
             except OSError:
                 pass
             return None
+        # Repair from the last file that parsed, so owners and helpers survive the damage; only fall
+        # back to an empty document when no usable copy was ever recorded.
+        restored = _restore_good(path, yaml)
+        if restored is not None:
+            # The damaged file is still on disk and MCDR reads it too, so it has to be replaced now
+            # rather than only being used in memory.
+            try:
+                _write_yaml(path, restored, yaml)
+                _remember_good(path)
+            except OSError:
+                pass
+            logging.getLogger('singleplayer_bridge').warning(
+                '%s 已从上一次可用的副本恢复', Path(path).name)
+            return restored
         # The owner is added by the caller, so the document starts empty and gets written back.
         return {'guest': [], 'user': [], 'helper': [], 'admin': [], 'owner': []}
+
+
+def _restore_good(path, yaml):
+    """Return the last document that parsed, or None when there is no usable copy."""
+    good = _good_copy(path)
+    try:
+        with good.open(encoding='utf8') as stream:
+            data = yaml.load(stream)
+    except Exception:  # noqa: BLE001 - a missing or equally damaged copy just means "no repair"
+        return None
+    return data if isinstance(data, dict) else None
 
 
 class Controller:

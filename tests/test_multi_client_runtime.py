@@ -115,3 +115,21 @@ def test_a_zero_filled_permission_file_does_not_stop_the_controller(tmp_path):
     # config.yml is MCDR's own file: it is moved aside so MCDR rewrites its defaults.
     assert not (tmp_path / 'config.yml').exists()
 
+
+def test_a_corrupt_file_is_repaired_from_the_last_good_copy(tmp_path):
+    """Damage must not silently wipe the other players' permissions."""
+    from ruamel.yaml import YAML
+    yaml = YAML()
+    (tmp_path / 'permission.yml').write_text(
+        'guest: []\nuser: [Helper1]\nhelper: []\nadmin: []\nowner: [Alice]\n', encoding='utf8')
+    (tmp_path / 'config.yml').write_text('language: en_us\n', encoding='utf8')
+    # The first pass parses cleanly, so it also records the known-good copy.
+    supervisor.configure_host(tmp_path, 'Host', 'zh_cn')
+
+    (tmp_path / 'permission.yml').write_bytes(b'\x00' * 96)
+    supervisor.configure_host(tmp_path, 'Host', 'zh_cn')
+
+    permissions = yaml.load((tmp_path / 'permission.yml').read_text(encoding='utf8'))
+    assert permissions['user'] == ['Helper1'], 'the surviving permissions must come back'
+    assert 'Alice' in permissions['owner'] and 'Host' in permissions['owner']
+
