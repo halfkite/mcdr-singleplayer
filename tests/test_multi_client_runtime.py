@@ -10,6 +10,8 @@ def controllers(tmp_path, monkeypatch):
     class Process:
         def __init__(self, args, **kwargs):
             self.stdin = io.StringIO()
+            # The controller drains the console on a thread, so the mock needs a stream to read.
+            self.stdout = io.StringIO()
             self.code = None
             self.environment = kwargs['env']
             processes.append(self)
@@ -17,9 +19,12 @@ def controllers(tmp_path, monkeypatch):
         def poll(self):
             return self.code
 
-        def wait(self):
+        def wait(self, timeout=None):
             self.code = 0
             return 0
+
+        def kill(self):
+            self.code = -9
 
     monkeypatch.setattr(supervisor.subprocess, 'Popen', Process)
     monkeypatch.setattr(supervisor, 'configure_host', lambda *args: None)
@@ -132,4 +137,28 @@ def test_a_corrupt_file_is_repaired_from_the_last_good_copy(tmp_path):
     permissions = yaml.load((tmp_path / 'permission.yml').read_text(encoding='utf8'))
     assert permissions['user'] == ['Helper1'], 'the surviving permissions must come back'
     assert 'Alice' in permissions['owner'] and 'Host' in permissions['owner']
+
+
+def test_the_child_log_rotates_instead_of_growing_without_bound(tmp_path):
+    path = tmp_path / 'controller-child.log'
+    log = supervisor.ChildLog(path, limit=200, keep=2)
+    for _ in range(60):
+        log.write('x' * 40 + '\n')
+    log.close()
+    assert path.stat().st_size < 300, 'the live log must stay near the cap'
+    assert (tmp_path / 'controller-child.log.1').is_file()
+
+
+def test_a_repeating_console_line_stops_a_runaway_child(tmp_path, monkeypatch):
+    """A closed stdin makes MCDR echo an empty command forever; that must not fill the disk."""
+    monkeypatch.setattr(supervisor, 'REPEAT_LIMIT', 5)
+    path = tmp_path / 'controller-child.log'
+    log = supervisor.ChildLog(path, limit=10 ** 6)
+    flooded = []
+    stream = io.StringIO('服务端已关闭，不能向其标准输入流输入命令\n' * 50)
+    supervisor.ChildReader(stream, log, flooded.append).run()
+    log.close()
+
+    assert flooded, 'the guard has to fire on a spinning console'
+    assert path.read_text(encoding='utf8').count('服务端已关闭') == 5, 'logging stops at the limit'
 

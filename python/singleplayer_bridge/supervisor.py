@@ -4,10 +4,118 @@ import logging
 import os
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
 from .profiles import ensure_profile, read_json, recommend
+
+# One session's console log is capped so a runaway child cannot fill the disk; the flood guard below
+# normally stops the cause long before this.
+CHILD_LOG_LIMIT = 32 * 1024 * 1024
+CHILD_LOG_KEEP = 2
+# A closed stdin makes MCDR's console thread read an empty line forever and echo it into its log.
+REPEAT_LIMIT = 2000
+# How long a retired child may take to leave before it is killed outright.
+RETIRE_TIMEOUT = 45.0
+
+
+class ChildLog:
+    """Append-only console log that rotates instead of growing without bound."""
+
+    def __init__(self, path, limit=CHILD_LOG_LIMIT, keep=CHILD_LOG_KEEP):
+        self.path = Path(path)
+        self.limit = limit
+        self.keep = keep
+        self.size = self.path.stat().st_size if self.path.is_file() else 0
+        self.stream = self.path.open('a', encoding='utf8')
+
+    def write(self, text):
+        if self.stream is None:
+            return
+        try:
+            self.stream.write(text)
+            self.stream.flush()
+        except (OSError, ValueError):
+            return
+        self.size += len(text.encode('utf8', 'ignore'))
+        if self.size >= self.limit:
+            self.rotate()
+
+    def rotate(self):
+        try:
+            self.stream.close()
+        except (OSError, ValueError):
+            pass
+        for index in range(self.keep, 1, -1):
+            newer = self.path.with_suffix(self.path.suffix + f'.{index - 1}')
+            older = self.path.with_suffix(self.path.suffix + f'.{index}')
+            try:
+                if newer.is_file():
+                    newer.replace(older)
+            except OSError:
+                pass
+        try:
+            if self.path.is_file():
+                self.path.replace(self.path.with_suffix(self.path.suffix + '.1'))
+        except OSError:
+            pass
+        self.size = 0
+        try:
+            self.stream = self.path.open('a', encoding='utf8')
+        except OSError:
+            self.stream = None
+
+    def close(self):
+        if self.stream is not None:
+            try:
+                self.stream.close()
+            except OSError:
+                pass
+            self.stream = None
+
+
+class ChildReader(threading.Thread):
+    """Drain the child's console into ChildLog and stop a repeating flood.
+
+    MCDR echoes an empty command for every line it reads from a closed stdin, which used to turn a
+    dead controller into gigabytes of identical warnings. The same line seen too often in a row is
+    treated as that runaway loop: logging stops and the child is terminated.
+    """
+
+    def __init__(self, stream, log, on_flood):
+        super().__init__(name='mcdr-console', daemon=True)
+        self.stream = stream
+        self.log = log
+        self.on_flood = on_flood
+        self.last = None
+        self.repeats = 0
+        self.flooded = False
+
+    def run(self):
+        try:
+            for line in self.stream:
+                if not self.flooded:
+                    self.log.write(line)
+                text = line.strip()
+                if text == self.last:
+                    self.repeats += 1
+                    if not self.flooded and self.repeats >= REPEAT_LIMIT:
+                        self.flooded = True
+                        try:
+                            self.on_flood(text)
+                        except Exception:  # noqa: BLE001 - the guard must never break the reader
+                            pass
+                else:
+                    self.last = text
+                    self.repeats = 1
+        except (OSError, ValueError):
+            pass
+        finally:
+            try:
+                self.stream.close()
+            except OSError:
+                pass
 
 
 def configure_host(common, player, language):
@@ -156,7 +264,9 @@ class Controller:
         self.process = None
         self.session = None
         self.retiring = False
+        self.retired_at = 0.0
         self.output = None
+        self.reader = None
         self.setup_requests = set()
         self.lease = None
         self.progress = progress or (lambda stage: None)
@@ -181,13 +291,47 @@ class Controller:
     def close(self):
         self.retire()
         if self.process:
-            self.process.wait()  # Keep the lease until outstanding restore tasks finish.
-            self.process.stdin.close()
-            self.output.close()
+            self._wait_or_kill(RETIRE_TIMEOUT)
+            self._close_output()
             self.process = None
         if self.lease:
             self.lease.close()
             self.lease = None
+
+    def _wait_or_kill(self, timeout):
+        """A retired child that ignores the request must not keep the controller alive."""
+        try:
+            self.process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            logging.warning('MCDR did not exit within %.0fs; terminating it', timeout)
+            try:
+                self.process.kill()
+                self.process.wait(timeout=15)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+
+    def _close_output(self):
+        if self.process and self.process.stdin:
+            try:
+                self.process.stdin.close()
+            except OSError:
+                pass
+        if self.reader is not None:
+            self.reader.join(timeout=5)
+            self.reader = None
+        if self.output is not None:
+            self.output.close()
+            self.output = None
+
+    def _flood_detected(self, text):
+        """The child is looping on an empty command; stop it instead of filling the disk."""
+        logging.error('MCDR console repeated one line %d times (%s); terminating it',
+                      REPEAT_LIMIT, text[:80])
+        try:
+            if self.process and self.process.poll() is None:
+                self.process.kill()
+        except OSError:
+            pass
 
     def retire(self):
         if self.process and self.process.poll() is None and not self.retiring:
@@ -195,16 +339,20 @@ class Controller:
                 self.process.stdin.write('!!spbridge internal retire\n')
                 self.process.stdin.flush()
                 self.retiring = True
+                self.retired_at = time.monotonic()
                 logging.info('Waiting for plugin tasks before retiring profile')
             except (OSError, BrokenPipeError):
                 pass
 
     def tick(self, state):
         if self.process and self.process.poll() is not None:
-            self.process.stdin.close()
-            self.output.close()
+            self._close_output()
             self.process = None
             # Keep the session marker after user-issued MCDR exit: do not auto-loop restart.
+        if (self.process and self.retiring and self.process.poll() is None
+                and time.monotonic() - self.retired_at > RETIRE_TIMEOUT):
+            # A plugin that does not support the retire command would otherwise run forever.
+            self._wait_or_kill(0)
         desired = state.get('session') if state.get('world_path') else None
         if self.process and desired != self.session:
             self.retire()
@@ -227,7 +375,7 @@ class Controller:
                                    MCDR_BRIDGE_LANGUAGE=language, MCDR_BRIDGE_CLIENT_ID=self.client_id)
                 world_log = self.common / 'log' / profile.name
                 world_log.mkdir(parents=True, exist_ok=True)
-                self.output = (world_log / 'controller-child.log').open('a', encoding='utf8')
+                self.output = ChildLog(world_log / 'controller-child.log')
                 environment['MCDR_BRIDGE_RUNTIME'] = str(self.common / 'runtime')
                 environment['MCDR_BRIDGE_LOG_DIR'] = str(world_log)
                 if 'bridge_port' in state:
@@ -240,9 +388,13 @@ class Controller:
                     'from mcdreforged import mcdr_entrypoint; mcdr_entrypoint.entrypoint()')
                 self.process = subprocess.Popen([self.python, '-c', mcdr_entrypoint, 'start',
                     '--config', str(self.common / 'config.yml'), '--permission', str(self.common / 'permission.yml')],
-                    cwd=profile, env=environment, stdin=subprocess.PIPE, stdout=self.output,
+                    cwd=profile, env=environment, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT, text=True, encoding='utf8',
                     creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+                # The console is drained on a thread so the log can be capped and a runaway child
+                # can be stopped, which a direct file handle could not do.
+                self.reader = ChildReader(self.process.stdout, self.output, self._flood_detected)
+                self.reader.start()
                 logging.info('MCDR profile started: %s', profile.name)
             elif self.lease:
                 self.lease.close()
