@@ -16,7 +16,7 @@ final class AutoRuntime {
     /** The tested MCDR release; the bundle's bootstrap.py declares the same version. */
     private static final String EXPECTED_MCDR = "2.16.0";
     /** Fallback for the materials folder when the mod container is unavailable; matches gradle.properties. */
-    private static final String BRIDGE_VERSION = "0.6.1";
+    private static final String BRIDGE_VERSION = "0.6.2";
     private static final long SETUP_RECHECK_MILLIS = 3000;
     private final BridgeConfig config;
     private final Path gameConfig;
@@ -215,9 +215,27 @@ final class AutoRuntime {
         if (!EXPECTED_MCDR.equals(installed)) return new SetupCheck(false, "outdated");
         String reported = mcdrVersion(environmentPython);
         if (reported == null) return new SetupCheck(false, "broken");
-        return EXPECTED_MCDR.equals(reported)
-                ? new SetupCheck(true, McdrSetup.READY)
-                : new SetupCheck(false, "outdated");
+        if (!EXPECTED_MCDR.equals(reported)) return new SetupCheck(false, "outdated");
+        // The bundled plugin has to match this jar as well: upgrading the mod used to leave the old
+        // plugin in place, which then never connected and looked like a runtime that refused to load.
+        String plugin = pluginVersion(common.resolve("plugins/singleplayer_bridge.mcdr"));
+        if (plugin == null) return new SetupCheck(false, "missing");
+        if (!bridgeVersion.equals(plugin)) return new SetupCheck(false, "plugin");
+        return new SetupCheck(true, McdrSetup.READY);
+    }
+
+    /** The version declared inside a packed MCDR plugin, or null when it cannot be read. */
+    static String pluginVersion(Path plugin) {
+        if (!Files.isRegularFile(plugin)) return null;
+        try (java.util.zip.ZipFile archive = new java.util.zip.ZipFile(plugin.toFile())) {
+            java.util.zip.ZipEntry entry = archive.getEntry("mcdreforged.plugin.json");
+            if (entry == null) return null;
+            String text = new String(archive.getInputStream(entry).readAllBytes(),
+                    java.nio.charset.StandardCharsets.UTF_8);
+            return com.google.gson.JsonParser.parseString(text).getAsJsonObject().get("version").getAsString();
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
     }
 
     /** Ask the isolated environment itself; a half-installed venv answers with a failure exit. */
@@ -245,7 +263,8 @@ final class AutoRuntime {
             String python = findPython();
             if (python == null) {
                 pythonStatus = PythonStatus.MISSING;
-                setup.check("");
+                // Keep the menu honest: without an interpreter nothing can be installed.
+                setup.check(McdrSetup.PYTHON_MISSING);
                 setup.write();
                 return;
             }

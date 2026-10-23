@@ -93,6 +93,7 @@ final class McdrSetupScreen extends Screen {
             case McdrSetup.PYTHON_MISSING -> "mcdr-singleplayer.setup.python_missing";
             case "missing" -> "mcdr-singleplayer.setup.missing";
             case "outdated" -> "mcdr-singleplayer.setup.outdated";
+            case "plugin" -> "mcdr-singleplayer.setup.plugin_outdated";
             case "broken" -> "mcdr-singleplayer.setup.broken";
             default -> "mcdr-singleplayer.setup.checking";
         };

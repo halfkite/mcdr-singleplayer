@@ -65,6 +65,18 @@ class McdrProbeTest {
         return new Result((Boolean) ready.invoke(check), (String) reason.invoke(check));
     }
 
+    @Test void thePackedPluginReportsItsOwnVersion(@TempDir Path directory) throws Exception {
+        Path plugin = directory.resolve("singleplayer_bridge.mcdr");
+        try (java.util.zip.ZipOutputStream archive = new java.util.zip.ZipOutputStream(
+                Files.newOutputStream(plugin))) {
+            archive.putNextEntry(new java.util.zip.ZipEntry("mcdreforged.plugin.json"));
+            archive.write("{\"version\": \"0.6.1\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            archive.closeEntry();
+        }
+        assertEquals("0.6.1", AutoRuntime.pluginVersion(plugin));
+        assertNull(AutoRuntime.pluginVersion(directory.resolve("absent.mcdr")));
+    }
+
     private static Path config(Path game) {
         return game.resolve("mcdr-singleplayer/mcdr-singleplayer-config.yml");
     }

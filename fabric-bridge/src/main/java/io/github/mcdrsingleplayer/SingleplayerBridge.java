@@ -35,7 +35,7 @@ public final class SingleplayerBridge implements ModInitializer {
     /** The mod entrypoint, so the title screen widget can read this launch's setup state. */
     private static volatile SingleplayerBridge INSTANCE;
     /** Fallback for the bundled materials folder; matches gradle.properties and is release-checked. */
-    private static final String BUNDLED_VERSION = "0.6.1";
+    private static final String BUNDLED_VERSION = "0.6.2";
     private volatile BridgeEndpoint endpoint;
     private volatile MinecraftServer worldServer;
     private BridgeConfig config;
