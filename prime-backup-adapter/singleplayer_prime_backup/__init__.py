@@ -223,9 +223,9 @@ def _install():
         def _temp_path(instance):
             return getattr(instance, '_ExportTempDirectory__temp_dir_path', None)
 
-        def _warn(message):
+        def _warn(message, *args):
             if _server is not None:
-                _server.logger.warning(message)
+                _server.logger.warning(message, *args)
 
         def _set_aside(path):
             """Move a directory that cannot be deleted out of the way."""

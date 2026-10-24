@@ -1,5 +1,6 @@
 """Resident controller: wait at menu, start a fresh MCDR process per save session."""
 import argparse
+import collections
 import logging
 import os
 import subprocess
@@ -16,8 +17,10 @@ CHILD_LOG_LIMIT = 32 * 1024 * 1024
 CHILD_LOG_KEEP = 2
 # A closed stdin makes MCDR's console thread read an empty line forever and echo it into its log.
 REPEAT_LIMIT = 2000
-# How long a retired child may take to leave before it is killed outright.
-RETIRE_TIMEOUT = 45.0
+# How long a retired child may take to leave before it is killed outright. The plugin finishes any
+# backup or restore it still runs before it stops, so this has to stay far above a slow save; the
+# limit only exists so a genuinely wedged child cannot keep the controller alive forever.
+RETIRE_TIMEOUT = 300.0
 
 
 class ChildLog:
@@ -78,9 +81,10 @@ class ChildLog:
 class ChildReader(threading.Thread):
     """Drain the child's console into ChildLog and stop a repeating flood.
 
-    MCDR echoes an empty command for every line it reads from a closed stdin, which used to turn a
-    dead controller into gigabytes of identical warnings. The same line seen too often in a row is
-    treated as that runaway loop: logging stops and the child is terminated.
+    MCDR answers a closed stdin with an endless echo of an empty command. That loop alternates
+    between two messages, so counting only *consecutive* identical lines never sees it: the same
+    line has to be counted inside a sliding window instead. Logging stops and the child is
+    terminated once one message fills the window.
     """
 
     def __init__(self, stream, log, on_flood):
@@ -88,8 +92,9 @@ class ChildReader(threading.Thread):
         self.stream = stream
         self.log = log
         self.on_flood = on_flood
-        self.last = None
-        self.repeats = 0
+        # Enough room for the alternating pair to reach the limit twice per window.
+        self.window = collections.deque(maxlen=max(REPEAT_LIMIT * 2, 64))
+        self.counts = collections.Counter()
         self.flooded = False
 
     def run(self):
@@ -97,24 +102,30 @@ class ChildReader(threading.Thread):
             for line in self.stream:
                 if not self.flooded:
                     self.log.write(line)
-                text = line.strip()
-                if text == self.last:
-                    self.repeats += 1
-                    if not self.flooded and self.repeats >= REPEAT_LIMIT:
-                        self.flooded = True
-                        try:
-                            self.on_flood(text)
-                        except Exception:  # noqa: BLE001 - the guard must never break the reader
-                            pass
-                else:
-                    self.last = text
-                    self.repeats = 1
+                self._count(line.strip())
         except (OSError, ValueError):
             pass
         finally:
             try:
                 self.stream.close()
             except OSError:
+                pass
+
+    def _count(self, text):
+        if self.flooded:
+            return
+        if len(self.window) == self.window.maxlen:
+            oldest = self.window[0]
+            self.counts[oldest] -= 1
+            if self.counts[oldest] <= 0:
+                del self.counts[oldest]
+        self.window.append(text)
+        self.counts[text] += 1
+        if self.counts[text] >= REPEAT_LIMIT:
+            self.flooded = True
+            try:
+                self.on_flood(text)
+            except Exception:  # noqa: BLE001 - the guard must never break the reader
                 pass
 
 
@@ -197,8 +208,11 @@ def _load_or_default(path, filename, yaml):
     try:
         with path.open(encoding='utf8') as stream:
             data = yaml.load(stream)
-        if not isinstance(data, dict):
-            return None
+    except FileNotFoundError:
+        return None
+    except Exception as error:  # noqa: BLE001 - any unreadable file must not stop the controller
+        return _rebuild(path, filename, yaml, error.__class__.__name__)
+    if isinstance(data, dict):
         if filename == 'permission.yml':
             # Remember what parsed cleanly; that copy is what a later corruption is repaired from.
             good = _good_copy(path)
@@ -208,39 +222,50 @@ def _load_or_default(path, filename, yaml):
             except OSError:
                 pass
         return data
-    except FileNotFoundError:
-        return None
-    except Exception as error:  # noqa: BLE001 - any unreadable file must not stop the controller
-        history = Path(path).parent / 'runtime/history' / f'{Path(path).name}.corrupt-{time.time_ns()}'
-        history.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        empty = Path(path).stat().st_size == 0
+    except OSError:
+        empty = False
+    if empty:
+        # Zero bytes is the other shape of an interrupted write: it parses as "no document" instead
+        # of raising, and MCDR would then run with an empty permission list without any complaint.
+        return _rebuild(path, filename, yaml, '空文件')
+    return None
+
+
+def _rebuild(path, filename, yaml, problem):
+    """Back a damaged file up, then restore what is still known about it."""
+    import shutil
+    history = Path(path).parent / 'runtime/history' / f'{Path(path).name}.corrupt-{time.time_ns()}'
+    history.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.copy2(path, history)
+    except OSError:
+        pass
+    logging.getLogger('singleplayer_bridge').warning(
+        '%s 无法解析（%s），已备份到 %s', Path(path).name, problem, history)
+    if filename != 'permission.yml':
         try:
-            shutil.copy2(path, history)
+            Path(path).unlink()
+        except OSError:
+            pass
+        return None
+    # Repair from the last file that parsed, so owners and helpers survive the damage; only fall
+    # back to an empty document when no usable copy was ever recorded.
+    restored = _restore_good(path, yaml)
+    if restored is not None:
+        # The damaged file is still on disk and MCDR reads it too, so it has to be replaced now
+        # rather than only being used in memory.
+        try:
+            _write_yaml(path, restored, yaml)
+            _remember_good(path)
         except OSError:
             pass
         logging.getLogger('singleplayer_bridge').warning(
-            '%s 无法解析（%s），已备份到 %s', Path(path).name, error.__class__.__name__, history)
-        if filename != 'permission.yml':
-            try:
-                Path(path).unlink()
-            except OSError:
-                pass
-            return None
-        # Repair from the last file that parsed, so owners and helpers survive the damage; only fall
-        # back to an empty document when no usable copy was ever recorded.
-        restored = _restore_good(path, yaml)
-        if restored is not None:
-            # The damaged file is still on disk and MCDR reads it too, so it has to be replaced now
-            # rather than only being used in memory.
-            try:
-                _write_yaml(path, restored, yaml)
-                _remember_good(path)
-            except OSError:
-                pass
-            logging.getLogger('singleplayer_bridge').warning(
-                '%s 已从上一次可用的副本恢复', Path(path).name)
-            return restored
-        # The owner is added by the caller, so the document starts empty and gets written back.
-        return {'guest': [], 'user': [], 'helper': [], 'admin': [], 'owner': []}
+            '%s 已从上一次可用的副本恢复', Path(path).name)
+        return restored
+    # The owner is added by the caller, so the document starts empty and gets written back.
+    return {'guest': [], 'user': [], 'helper': [], 'admin': [], 'owner': []}
 
 
 def _restore_good(path, yaml):
@@ -292,8 +317,9 @@ class Controller:
         self.retire()
         if self.process:
             self._wait_or_kill(RETIRE_TIMEOUT)
-            self._close_output()
-            self.process = None
+        # Also drop the log handle when the child never started: Popen can fail after the file is open.
+        self._close_output()
+        self.process = None
         if self.lease:
             self.lease.close()
             self.lease = None

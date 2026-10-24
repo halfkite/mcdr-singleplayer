@@ -152,3 +152,69 @@ def test_real_adapter_hooks_publish_action_stages_and_failure(monkeypatch, tmp_p
         current_restore.reset(token)
     adapter.on_unload(server)
     assert Temp.erase is original_temp_erase
+
+
+def test_cleanup_failures_never_turn_a_finished_restore_into_a_failure(monkeypatch, tmp_path):
+    """Prime Backup runs its scratch cleanup after the world is already written."""
+    import errno
+    import sys
+    import singleplayer_prime_backup as adapter
+
+    temp_dir = tmp_path / '.prime_backup.export_temp_1_2'
+    (temp_dir / 'trash_bin').mkdir(parents=True)
+    calls = []
+
+    class Temp:
+        def __init__(self):
+            self._ExportTempDirectory__temp_dir_path = temp_dir
+
+        def prepare(self):
+            calls.append('prepare')
+            if calls.count('prepare') == 1:
+                raise OSError(errno.ENOTEMPTY, 'Directory not empty', str(temp_dir / 'trash_bin'))
+
+        def erase(self):
+            calls.append('erase')
+            raise OSError(errno.ENOTEMPTY, 'Directory not empty', str(temp_dir / 'trash_bin'))
+
+    class Action:
+        def run(self, *args, **kwargs):
+            return []
+
+    modules = {
+        'prime_backup.mcdr.task.backup.create_backup_task': SimpleNamespace(CreateBackupTask=Action),
+        'prime_backup.mcdr.task.backup.restore_backup_task': SimpleNamespace(RestoreBackupTask=Action),
+        'prime_backup.action.create_backup_action': SimpleNamespace(CreateBackupAction=Action),
+        'prime_backup.action.export_backup_action_directory': SimpleNamespace(
+            ExportBackupToDirectoryAction=Action, _TrashBin=SimpleNamespace(add=lambda *args: None),
+            _ExportTempDirectory=Temp),
+    }
+    server = SimpleNamespace(get_plugin_instance=lambda name: object(),
+        get_plugin_metadata=lambda name: SimpleNamespace(version='1.13.1'), logger=logging.getLogger('test'))
+    monkeypatch.setattr(adapter, '_server', server)
+    monkeypatch.setattr(adapter, '_prime_instance', None)
+    monkeypatch.setattr(adapter, '_patches', [])
+    monkeypatch.setattr(adapter, '_world_path', str(tmp_path / 'world'))
+    monkeypatch.setattr(adapter, 'importlib', SimpleNamespace(import_module=lambda name: modules[name]))
+    # Fail on the first attempt instead of waiting out the real retry window.
+    monkeypatch.setattr(adapter, 'retry_temp_cleanup', lambda action, timeout=0, on_retry=None: action())
+    monkeypatch.setitem(sys.modules, 'prime_backup.action.get_backup_action',
+                        SimpleNamespace(GetBackupAction=lambda *args, **kwargs: Action()))
+    adapter._install()
+
+    # The rescue path only applies while a restore is running, which is when the progress is set.
+    world = tmp_path / 'world'
+    world.mkdir(exist_ok=True)
+    token = current_restore.set(RestoreProgress(
+        {'progress_path': str(tmp_path / '.progress.json')}, world, 1, logging.getLogger('test')))
+    try:
+        temp = Temp()
+        temp.prepare()
+        assert calls.count('prepare') == 2, 'the cleanup has to be retried on a fresh directory'
+        assert list(tmp_path.glob('*.stale-*')), 'the directory that could not be removed is kept aside'
+
+        temp.erase()  # must never raise: the world is already restored at this point
+        assert calls.count('erase') == 1
+    finally:
+        current_restore.reset(token)
+    adapter.on_unload(server)

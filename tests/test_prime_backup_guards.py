@@ -121,12 +121,13 @@ def test_a_leftover_trash_entry_is_replaced_instead_of_blocking_the_restore(worl
     trash = tmp_path / 'trash_bin' / world.name
     (trash / 'region').mkdir(parents=True)
     (trash / 'region' / 'r.0.0.mca').write_bytes(b'old world')
-    assert (trash / 'region' / 'r.0.0.mca').exists()
 
     move_world_to_trash(world, trash, timeout=2)
 
-    assert not (trash / 'region' / 'r.0.0.mca').exists(), 'the stale copy has to be gone'
+    assert not (trash / 'region' / 'r.0.0.mca').exists(), 'the stale copy must leave the slot'
     assert (trash / 'level.dat').is_file(), 'the world has to end up in the trash slot'
+    kept = list(trash.parent.glob(world.name + '.stale-*'))
+    assert kept and (kept[0] / 'region' / 'r.0.0.mca').is_file(), 'the old copy is kept, not deleted'
 
 
 def test_an_unusable_trash_slot_reports_a_readable_error(world, tmp_path):

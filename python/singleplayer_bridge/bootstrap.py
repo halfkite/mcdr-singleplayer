@@ -16,6 +16,7 @@ from pathlib import Path
 
 from .profiles import read_json, write_json
 from .installation_progress import InstallationProgress
+from . import __version__
 
 PRIME_VERSION = '1.13.1'
 PRIME_HASH = '081c91872ff3f6ab438328b96237e5e8db87ebff28e46b909eca804b6320db2b'
@@ -32,7 +33,7 @@ def download_checked(urls, destination, digest, opener=urllib.request.urlopen):
     for url in urls:
         try:
             started = time.monotonic()
-            request = urllib.request.Request(url, headers={'User-Agent': 'MCDR-Singleplayer-Bridge/0.6.1'})
+            request = urllib.request.Request(url, headers={'User-Agent': f'MCDR-Singleplayer-Bridge/{__version__}'})
             with opener(request, timeout=15) as response, temporary.open('wb') as output:
                 total = 0
                 while chunk := response.read(65536):

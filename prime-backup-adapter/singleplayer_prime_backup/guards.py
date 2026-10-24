@@ -26,21 +26,23 @@ def clear_trash_target(target):
     """Free a trash slot that a previous attempt left behind.
 
     Windows refuses to rename a directory onto one that still holds files (WinError 145), which is
-    what a leftover trash entry from an interrupted restore looks like. A slot that cannot be
-    removed is renamed aside instead, so the rename below still has an empty destination.
+    what a leftover trash entry from an interrupted restore looks like. The entry is renamed aside
+    rather than deleted: it can still be the copy a rollback needs, and it disappears with the
+    temporary directory either way.
     """
     target = Path(target)
     if not target.exists():
         return
-    import shutil
-    try:
-        shutil.rmtree(target)
-        return
-    except OSError:
-        pass
     aside = target.with_name(target.name + '.stale-' + str(time.time_ns()))
     try:
         target.rename(aside)
+        return
+    except OSError:
+        pass
+    # A rename can be refused while a file inside is open; removing is the fallback.
+    import shutil
+    try:
+        shutil.rmtree(target)
     except OSError:
         pass
 

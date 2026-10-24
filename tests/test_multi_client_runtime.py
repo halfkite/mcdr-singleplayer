@@ -149,6 +149,32 @@ def test_the_child_log_rotates_instead_of_growing_without_bound(tmp_path):
     assert (tmp_path / 'controller-child.log.1').is_file()
 
 
+def test_an_alternating_console_loop_is_stopped_too(tmp_path, monkeypatch):
+    """The real loop pairs two messages, so counting consecutive identical lines never fires."""
+    monkeypatch.setattr(supervisor, 'REPEAT_LIMIT', 5)
+    path = tmp_path / 'controller-child.log'
+    log = supervisor.ChildLog(path, limit=10 ** 6)
+    flooded = []
+    text = ("服务端已关闭，不能向其标准输入流输入命令\n被输入的命令: ''\n") * 40
+    supervisor.ChildReader(io.StringIO(text), log, flooded.append).run()
+    log.close()
+
+    assert flooded, 'the paired loop has to be recognised as a flood'
+    assert len(path.read_text(encoding='utf8').splitlines()) < 30, 'the flood must not be logged in full'
+
+
+def test_a_zero_length_permission_file_is_rebuilt(tmp_path):
+    """An interrupted write can leave zero bytes, which parses as "no document" instead of failing."""
+    (tmp_path / 'permission.yml').write_bytes(b'')
+    (tmp_path / 'config.yml').write_text('language: en_us\n', encoding='utf8')
+
+    supervisor.configure_host(tmp_path, 'Host', 'zh_cn')
+
+    from ruamel.yaml import YAML
+    permissions = YAML().load((tmp_path / 'permission.yml').read_text(encoding='utf8'))
+    assert permissions['owner'] == ['Host']
+
+
 def test_a_repeating_console_line_stops_a_runaway_child(tmp_path, monkeypatch):
     """A closed stdin makes MCDR echo an empty command forever; that must not fill the disk."""
     monkeypatch.setattr(supervisor, 'REPEAT_LIMIT', 5)
