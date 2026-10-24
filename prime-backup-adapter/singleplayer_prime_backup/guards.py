@@ -22,6 +22,29 @@ def check_binding(world, config, allow_incomplete=False):
     return world
 
 
+def clear_trash_target(target):
+    """Free a trash slot that a previous attempt left behind.
+
+    Windows refuses to rename a directory onto one that still holds files (WinError 145), which is
+    what a leftover trash entry from an interrupted restore looks like. A slot that cannot be
+    removed is renamed aside instead, so the rename below still has an empty destination.
+    """
+    target = Path(target)
+    if not target.exists():
+        return
+    import shutil
+    try:
+        shutil.rmtree(target)
+        return
+    except OSError:
+        pass
+    aside = target.with_name(target.name + '.stale-' + str(time.time_ns()))
+    try:
+        target.rename(aside)
+    except OSError:
+        pass
+
+
 def move_world_to_trash(world, target, progress=None, timeout=10):
     """Only rename: open child directories can deny a move despite sharing DELETE.
 
@@ -31,13 +54,24 @@ def move_world_to_trash(world, target, progress=None, timeout=10):
     """
     deadline = time.monotonic() + timeout
     was_modified = bool(progress and progress.data['modified'])
+    cleared = False
     while True:
         if progress is not None:
             progress.update('restoring')
         try:
+            if not cleared:
+                clear_trash_target(target)
+                cleared = True
             os.rename(world, target)
             return
         except OSError as exc:
+            # 145 is "directory not empty": the destination still holds an older copy.
+            if getattr(exc, 'winerror', None) == 145 or exc.errno == errno.ENOTEMPTY:
+                cleared = False
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(tr('error.restore_directory_still_in_use', Path(world).name)) from exc
+                time.sleep(0.2)
+                continue
             retryable = getattr(exc, 'winerror', None) in (5, 32, 33)
             detail = tr('error.restore_directory_still_in_use', Path(world).name) if retryable else str(exc)
             if progress is not None:

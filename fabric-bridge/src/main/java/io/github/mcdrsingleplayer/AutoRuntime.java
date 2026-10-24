@@ -16,7 +16,7 @@ final class AutoRuntime {
     /** The tested MCDR release; the bundle's bootstrap.py declares the same version. */
     private static final String EXPECTED_MCDR = "2.16.0";
     /** Fallback for the materials folder when the mod container is unavailable; matches gradle.properties. */
-    private static final String BRIDGE_VERSION = "0.6.2";
+    private static final String BRIDGE_VERSION = "0.6.3";
     private static final long SETUP_RECHECK_MILLIS = 3000;
     private final BridgeConfig config;
     private final Path gameConfig;

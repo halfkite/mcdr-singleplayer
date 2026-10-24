@@ -9,7 +9,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from singleplayer_prime_backup.guards import check_backup, check_binding, check_unlocked, retry_temp_cleanup
+from singleplayer_prime_backup.guards import (check_backup, check_binding, check_unlocked,
+                                             move_world_to_trash, retry_temp_cleanup)
 
 
 @pytest.fixture
@@ -113,3 +114,24 @@ def test_temp_cleanup_preserves_persistent_or_unrelated_errors():
         with pytest.raises(OSError) as raised:
             retry_temp_cleanup(erase, timeout=0)
         assert raised.value is error and len(calls) == expected_calls
+
+
+def test_a_leftover_trash_entry_is_replaced_instead_of_blocking_the_restore(world, tmp_path):
+    """Windows refuses to rename onto a directory that still holds files (WinError 145)."""
+    trash = tmp_path / 'trash_bin' / world.name
+    (trash / 'region').mkdir(parents=True)
+    (trash / 'region' / 'r.0.0.mca').write_bytes(b'old world')
+    assert (trash / 'region' / 'r.0.0.mca').exists()
+
+    move_world_to_trash(world, trash, timeout=2)
+
+    assert not (trash / 'region' / 'r.0.0.mca').exists(), 'the stale copy has to be gone'
+    assert (trash / 'level.dat').is_file(), 'the world has to end up in the trash slot'
+
+
+def test_an_unusable_trash_slot_reports_a_readable_error(world, tmp_path):
+    blocker = tmp_path / 'blocker'
+    blocker.write_bytes(b'x')
+    # A file where the slot has to be: the slot is freed and the world still lands in it.
+    move_world_to_trash(world, blocker, timeout=2)
+    assert (blocker / 'level.dat').is_file()

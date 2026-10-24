@@ -2,6 +2,7 @@
 from singleplayer_bridge.i18n import tr
 import functools
 import importlib
+import os
 import time
 from pathlib import Path
 
@@ -216,15 +217,66 @@ def _install():
         _patches.append((trash, add, original_add))
     temp_dir = getattr(module, '_ExportTempDirectory', None)
     if temp_dir is not None:
+        original_prepare = getattr(temp_dir, 'prepare', None)
         original_erase = temp_dir.erase
+
+        def _temp_path(instance):
+            return getattr(instance, '_ExportTempDirectory__temp_dir_path', None)
+
+        def _warn(message):
+            if _server is not None:
+                _server.logger.warning(message)
+
+        def _set_aside(path):
+            """Move a directory that cannot be deleted out of the way."""
+            if path is None or not Path(path).exists():
+                return None
+            aside = Path(str(path) + '.stale-' + str(time.time_ns()))
+            try:
+                os.rename(path, aside)
+            except OSError:
+                return None
+            return aside
+
+        if original_prepare is not None:
+            @functools.wraps(original_prepare)
+            def prepare(directory):
+                """Scratch cleanup must not decide the restore's outcome.
+
+                Prime Backup deletes the previous attempt's temporary directory before it starts, and a
+                leftover that cannot be removed used to abort the restore with WinError 145 before any
+                world data was written.
+                """
+                from singleplayer_bridge.restore_progress import current_restore
+                progress = current_restore.get()
+                if progress is None:
+                    return original_prepare(directory)
+                try:
+                    return retry_temp_cleanup(lambda: original_prepare(directory), timeout=20,
+                                               on_retry=lambda exc: progress.update('restoring', detail=str(exc)))
+                except OSError as exc:
+                    aside = _set_aside(_temp_path(directory))
+                    if aside is not None:
+                        _warn('Prime Backup 临时目录清理失败（%s），已改名为 %s 并继续', exc, aside.name)
+                    return original_prepare(directory)
+            temp_dir.prepare = prepare
+            _patches.append((temp_dir, prepare, original_prepare))
+
         @functools.wraps(original_erase)
         def erase(directory):
+            """The world is already in its final state here; leftover scratch files are not a failure."""
             from singleplayer_bridge.restore_progress import current_restore
             progress = current_restore.get()
             if progress is None:
                 return original_erase(directory)
-            return retry_temp_cleanup(lambda: original_erase(directory),
-                on_retry=lambda exc: progress.update('restoring', detail=str(exc)))
+            try:
+                return retry_temp_cleanup(lambda: original_erase(directory), timeout=20,
+                                           on_retry=lambda exc: progress.update('restoring', detail=str(exc)))
+            except OSError as exc:
+                aside = _set_aside(_temp_path(directory))
+                _warn('Prime Backup 临时目录清理失败（%s），已保留为 %s，不影响回档结果',
+                      exc, aside.name if aside is not None else '?')
+                return None
         temp_dir.erase = erase
         _patches.append((temp_dir, erase, original_erase))
     _prime_instance = instance
@@ -245,6 +297,8 @@ def on_unload(server):
             cls.add = original
         elif getattr(cls, 'erase', None) is wrapper:
             cls.erase = original
+        elif getattr(cls, 'prepare', None) is wrapper:
+            cls.prepare = original
         elif getattr(cls, 'run', None) is wrapper:
             cls.run = original
     _patches.clear()
