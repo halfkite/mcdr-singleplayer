@@ -198,6 +198,8 @@
   "mcdr-singleplayer.setup.download": "立即下载 MCDR",
   "mcdr-singleplayer.setup.python_missing": "未检测到 Python\nMCDR 需要 Python 3.10 或更高版本并包含 pip\n安装后本窗口会自动继续，无需重启游戏",
   "mcdr-singleplayer.setup.plugin_outdated": "运行环境里的桥接插件与本模组版本不一致\n点击下方按钮更新到匹配的版本，插件与配置会保留",
+  "mcdr-singleplayer.setup.stalled": "MCDR 正在完成备份或回档，已等待 %s 秒\n完成后会自动退出；也可以点下方按钮立即结束",
+  "mcdr-singleplayer.setup.terminate": "强制结束 MCDR",
   "mcdr-singleplayer.setup.python_download": "下载 Python",
   "mcdr-singleplayer.setup.close": "稍后",
   "mcdr-singleplayer.setup.escape_hint": "按 Esc 关闭，可随时用主菜单原版按钮行右侧的模组图标按钮重新打开",

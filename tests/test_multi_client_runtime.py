@@ -1,4 +1,6 @@
 import io
+import json
+import time
 from pathlib import Path
 
 from singleplayer_bridge import supervisor
@@ -188,3 +190,33 @@ def test_a_repeating_console_line_stops_a_runaway_child(tmp_path, monkeypatch):
     assert flooded, 'the guard has to fire on a spinning console'
     assert path.read_text(encoding='utf8').count('服务端已关闭') == 5, 'logging stops at the limit'
 
+def test_a_long_retire_is_offered_to_the_player_instead_of_being_killed(tmp_path, monkeypatch):
+    """A backup or restore under way must never be aborted by the controller on its own."""
+    common, guest, host, processes, stages = controllers(tmp_path, monkeypatch)
+    host.tick(world_state(tmp_path, "host-world", 25591))
+    process = host.process
+
+    host.tick({})  # leaving the world retires the child, which may still be finishing tasks
+    assert host.retiring and process.code is None
+
+    monkeypatch.setattr(supervisor, "RETIRE_NOTICE_AFTER", 0)
+    host.retired_at = time.monotonic() - 40
+    host.tick({})
+
+    record = json.loads((tmp_path / "retire-status.json").read_text(encoding="utf8"))
+    assert record["stalled"] is True and record["seconds"] >= 40
+    assert process.code is None, "the controller must wait instead of ending the child"
+
+
+def test_the_player_can_stop_a_retiring_child(tmp_path, monkeypatch):
+    common, guest, host, processes, stages = controllers(tmp_path, monkeypatch)
+    host.tick(world_state(tmp_path, "host-world", 25591))
+    process = host.process
+    host.tick({})
+    assert process.code is None
+
+    (tmp_path / "terminate.request").write_text("", encoding="utf8")
+    host.tick({})
+
+    assert process.code is not None, "the child has to be ended when the player asks for it"
+    assert not (tmp_path / "terminate.request").exists(), "the request is consumed once"

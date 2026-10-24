@@ -14,13 +14,19 @@ final class McdrSetupScreen extends Screen {
     /** What the menu shows; the runtime is prepared while no save is open, never for one world. */
     enum Status { CHECKING, READY, INSTALLING, FAILED, NEEDS_INSTALL, NEEDS_PYTHON }
 
-    record View(Status status, String reason, InstallProgress progress) { }
+    record View(Status status, String reason, InstallProgress progress, int stalledSeconds) {
+        View(Status status, String reason, InstallProgress progress) {
+            this(status, reason, progress, 0);
+        }
+    }
 
     interface Behaviour {
         View view();
         void install();
         void openPython();
         void dismiss();
+        /** Ends MCDR although it is still finishing a backup or restore. */
+        default void terminate() { }
     }
 
     private final Behaviour behaviour;
@@ -34,9 +40,15 @@ final class McdrSetupScreen extends Screen {
     protected void init() {
         int buttonWidth = Math.min(200, width - 40);
         int center = (width - buttonWidth) / 2;
-        Status status = behaviour.view().status();
-        boolean needsPython = status == Status.NEEDS_PYTHON;
-        boolean downloadable = status == Status.NEEDS_INSTALL || status == Status.FAILED;
+        View view = behaviour.view();
+        Status status = view.status();
+        boolean stalled = view.stalledSeconds() > 0;
+        boolean needsPython = status == Status.NEEDS_PYTHON && !stalled;
+        boolean downloadable = (status == Status.NEEDS_INSTALL || status == Status.FAILED) && !stalled;
+        if (stalled) {
+            addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.setup.terminate"),
+                    button -> behaviour.terminate()).bounds(center, height - 56, buttonWidth, 20).build());
+        }
         if (needsPython) {
             addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.setup.python_download"),
                     button -> behaviour.openPython()).bounds(center, height - 56, buttonWidth, 20).build());
@@ -45,7 +57,7 @@ final class McdrSetupScreen extends Screen {
             addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.setup.download"),
                     button -> behaviour.install()).bounds(center, height - 56, buttonWidth, 20).build());
         }
-        boolean hasPrimary = needsPython || downloadable;
+        boolean hasPrimary = needsPython || downloadable || stalled;
         addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.setup.close"), button -> onClose())
                 .bounds(center, hasPrimary ? height - 32 : height - 48, buttonWidth, 20).build());
     }
@@ -60,7 +72,7 @@ final class McdrSetupScreen extends Screen {
         graphics.centeredText(font, Component.translatable("mcdr-singleplayer.mod_name"), width / 2, top, 0xffaaaaaa);
         graphics.centeredText(font, title, width / 2, top + 20, 0xffffffff);
         int y = top + 44;
-        for (var line : font.split(Component.translatable(messageKey(view)), textWidth)) {
+        for (var line : font.split(message(view), textWidth)) {
             graphics.centeredText(font, line, width / 2, y, 0xffdddddd);
             y += 10;
         }
@@ -81,6 +93,14 @@ final class McdrSetupScreen extends Screen {
         graphics.centeredText(font, Component.translatable("mcdr-singleplayer.setup.escape_hint"), width / 2,
                 Math.min(y + 10, height - 72), 0xff888888);
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+    }
+
+    /** The stalled prompt names the wait; every other status has one fixed paragraph. */
+    private static Component message(View view) {
+        if (view.stalledSeconds() > 0) {
+            return Component.translatable("mcdr-singleplayer.setup.stalled", view.stalledSeconds());
+        }
+        return Component.translatable(messageKey(view));
     }
 
     /** One short paragraph per status; the four detected reasons keep their own wording. */

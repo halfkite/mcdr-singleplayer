@@ -198,6 +198,8 @@
   "mcdr-singleplayer.setup.download": "Download MCDR now",
   "mcdr-singleplayer.setup.python_missing": "Python was not found\nMCDR needs Python 3.10 or newer with pip\nThis window continues automatically once it is installed",
   "mcdr-singleplayer.setup.plugin_outdated": "The bundled bridge plugin does not match this mod version\nUse the button below to update it; plugins and settings are kept",
+  "mcdr-singleplayer.setup.stalled": "MCDR is finishing a backup or restore and has waited %s s\nIt exits when that finishes; the button below ends it now",
+  "mcdr-singleplayer.setup.terminate": "Stop MCDR now",
   "mcdr-singleplayer.setup.python_download": "Download Python",
   "mcdr-singleplayer.setup.close": "Later",
   "mcdr-singleplayer.setup.escape_hint": "Press Esc to close; reopen this screen anytime with the mod icon button in the vanilla menu button row",

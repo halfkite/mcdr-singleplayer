@@ -1,6 +1,7 @@
 """Resident controller: wait at menu, start a fresh MCDR process per save session."""
 import argparse
 import collections
+import json
 import logging
 import os
 import subprocess
@@ -17,10 +18,12 @@ CHILD_LOG_LIMIT = 32 * 1024 * 1024
 CHILD_LOG_KEEP = 2
 # A closed stdin makes MCDR's console thread read an empty line forever and echo it into its log.
 REPEAT_LIMIT = 2000
-# How long a retired child may take to leave before it is killed outright. The plugin finishes any
-# backup or restore it still runs before it stops, so this has to stay far above a slow save; the
-# limit only exists so a genuinely wedged child cannot keep the controller alive forever.
+# How long a retired child may take to leave before the controller stops waiting by itself. The
+# plugin finishes any backup or restore it still runs before it stops, so this only applies when the
+# game is already gone; while the player is there the menu offers to terminate instead.
 RETIRE_TIMEOUT = 300.0
+# Waiting this long without the child leaving is reported to the player together with a way out.
+RETIRE_NOTICE_AFTER = 30.0
 
 
 class ChildLog:
@@ -295,6 +298,8 @@ class Controller:
         self.setup_requests = set()
         self.lease = None
         self.progress = progress or (lambda stage: None)
+        self.published_retire = ''
+        self.terminate_handled = False
 
     def acquire(self):
         if self.lease is not None:
@@ -349,6 +354,40 @@ class Controller:
             self.output.close()
             self.output = None
 
+    def _retire_status_path(self):
+        return Path(self.state_file).parent / 'retire-status.json'
+
+    def _publish_retire_state(self):
+        """Tell the game how long the retired child has been finishing its work."""
+        active = bool(self.process and self.retiring and self.process.poll() is None)
+        seconds = int(time.monotonic() - self.retired_at) if active and self.retired_at else 0
+        data = json.dumps({'protocol': 1, 'stalled': active and seconds >= RETIRE_NOTICE_AFTER,
+                           'seconds': seconds})
+        if data == self.published_retire:
+            return
+        path = self._retire_status_path()
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = path.with_suffix('.json.tmp')
+            temporary.write_text(data, encoding='utf8')
+            temporary.replace(path)
+            self.published_retire = data
+        except OSError:
+            pass
+
+    def _apply_terminate_request(self):
+        """The player asked to stop MCDR while it still had tasks to finish."""
+        request = Path(self.state_file).parent / 'terminate.request'
+        if not request.exists():
+            return
+        try:
+            request.unlink()
+        except OSError:
+            pass
+        if self.process and self.process.poll() is None:
+            logging.warning('The player asked to stop MCDR before its tasks finished; terminating it')
+            self._wait_or_kill(0)
+
     def _flood_detected(self, text):
         """The child is looping on an empty command; stop it instead of filling the disk."""
         logging.error('MCDR console repeated one line %d times (%s); terminating it',
@@ -375,10 +414,10 @@ class Controller:
             self._close_output()
             self.process = None
             # Keep the session marker after user-issued MCDR exit: do not auto-loop restart.
-        if (self.process and self.retiring and self.process.poll() is None
-                and time.monotonic() - self.retired_at > RETIRE_TIMEOUT):
-            # A plugin that does not support the retire command would otherwise run forever.
-            self._wait_or_kill(0)
+        # While the game is still there, a long retire is reported to the player with an offer to
+        # stop it; the controller never ends a backup or restore on its own.
+        self._publish_retire_state()
+        self._apply_terminate_request()
         desired = state.get('session') if state.get('world_path') else None
         if self.process and desired != self.session:
             self.retire()

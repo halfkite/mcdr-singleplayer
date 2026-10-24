@@ -16,7 +16,7 @@ final class AutoRuntime {
     /** The tested MCDR release; the bundle's bootstrap.py declares the same version. */
     private static final String EXPECTED_MCDR = "2.16.0";
     /** Fallback for the materials folder when the mod container is unavailable; matches gradle.properties. */
-    private static final String BRIDGE_VERSION = "0.6.3";
+    private static final String BRIDGE_VERSION = "0.6.4";
     private static final long SETUP_RECHECK_MILLIS = 3000;
     private final BridgeConfig config;
     private final Path gameConfig;
@@ -35,6 +35,9 @@ final class AutoRuntime {
     private volatile boolean closing;
     private volatile PythonStatus pythonStatus = PythonStatus.CHECKING;
     private volatile InstallProgress installProgress = new InstallProgress("preparing", 0);
+    /** Cached reading of the controller's retire status, refreshed when the file changes. */
+    private long stalledModified;
+    private int stalledValue;
 
     private enum PythonStatus { CHECKING, MISSING, READY }
 
@@ -89,6 +92,38 @@ final class AutoRuntime {
     }
 
     McdrSetup setupStatus() { return setup; }
+
+    /**
+     * How long MCDR has been finishing work it must not be interrupted in, or 0 when it is idle.
+     * The controller publishes this next to the session state; the menu turns it into a prompt.
+     */
+    int stalledSeconds() {
+        Path status = stateFile.resolveSibling("retire-status.json");
+        try {
+            long modified = Files.getLastModifiedTime(status).toMillis();
+            if (modified == stalledModified) return stalledValue;
+            JsonObject record = com.google.gson.JsonParser.parseString(Files.readString(status)).getAsJsonObject();
+            boolean stalled = record.has("stalled") && record.get("stalled").getAsBoolean();
+            stalledValue = stalled && record.has("seconds") ? record.get("seconds").getAsInt() : 0;
+            stalledModified = modified;
+            return stalledValue;
+        } catch (IOException | RuntimeException e) {
+            stalledModified = 0;
+            stalledValue = 0;
+            return 0;
+        }
+    }
+
+    /** Ask the controller to end MCDR even though it is still finishing tasks. */
+    void requestTerminate() {
+        try {
+            Files.createDirectories(stateFile.getParent());
+            Files.writeString(stateFile.resolveSibling("terminate.request"), "",
+                    java.nio.charset.StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            LOGGER.warn("Could not ask the controller to stop MCDR", e);
+        }
+    }
 
     /** Installs MCDR after the user accepted the download from the main menu. */
     void requestInstall() {

@@ -35,7 +35,7 @@ public final class SingleplayerBridge implements ModInitializer {
     /** The mod entrypoint, so the title screen widget can read this launch's setup state. */
     private static volatile SingleplayerBridge INSTANCE;
     /** Fallback for the bundled materials folder; matches gradle.properties and is release-checked. */
-    private static final String BUNDLED_VERSION = "0.6.3";
+    private static final String BUNDLED_VERSION = "0.6.4";
     private volatile BridgeEndpoint endpoint;
     private volatile MinecraftServer worldServer;
     private BridgeConfig config;
@@ -46,6 +46,7 @@ public final class SingleplayerBridge implements ModInitializer {
     private boolean pythonPromptDismissed;
     private InstallProgress.Feedback installFeedback = new InstallProgress.Feedback();
     private boolean mcdrSetupPromptShown;
+    private boolean mcdrRetirePromptShown;
     private boolean mcdrSetupPromptDismissed;
     private boolean mcdrNoticeAnnounced;
     private int setupCheckTicks;
@@ -171,6 +172,7 @@ public final class SingleplayerBridge implements ModInitializer {
                     mcdrNoticeAnnounced = false;
                     pollMcdrSetup(client);
                     if (!mcdrSetupPromptDismissed) maybeOpenMcdrSetupPrompt(client);
+            maybeOpenRetirePrompt(client);
                 } else if (runtime.pythonReady()) {
                     InstallProgress value = currentInstallProgress();
                     // Only real installation work is narrated; a running controller must stay quiet.
@@ -229,6 +231,20 @@ public final class SingleplayerBridge implements ModInitializer {
     }
 
     /**
+     * MCDR keeps running after the world closes while it finishes a backup or restore. Once that
+     * wait gets long the player is told about it and offered a button that ends it, so a slow save
+     * is never interrupted silently and a wedged one never leaves them stuck.
+     */
+    private void maybeOpenRetirePrompt(Minecraft client) {
+        if (mcdrRetirePromptShown) return;
+        if (!(client.gui.screen() instanceof TitleScreen)) return;
+        if (client.getSingleplayerServer() != null) return;
+        if (runtime.stalledSeconds() <= 0) return;
+        mcdrRetirePromptShown = true;
+        openMcdrSetup(client, false);
+    }
+
+    /**
      * The auto-opened prompt dismisses for the rest of this launch; the manual button only returns
      * to the menu, so reopening it from the menu never hides the download from later visits.
      */
@@ -254,6 +270,12 @@ public final class SingleplayerBridge implements ModInitializer {
             @Override public void dismiss() {
                 if (dismissAfterClose) mcdrSetupPromptDismissed = true;
             }
+
+            @Override public void terminate() {
+                mcdrRetirePromptShown = true;
+                runtime.requestTerminate();
+                client.gui.setScreen(null);
+            }
         }));
     }
 
@@ -264,7 +286,8 @@ public final class SingleplayerBridge implements ModInitializer {
     private McdrSetupScreen.View mcdrSetupView() {
         McdrSetup setup = runtime.setupStatus();
         InstallProgress progress = runtime.installProgress(false);
-        return new McdrSetupScreen.View(setupStatus(setup, progress), setup == null ? "" : setup.reason(), progress);
+        return new McdrSetupScreen.View(setupStatus(setup, progress), setup == null ? "" : setup.reason(), progress,
+                runtime.stalledSeconds());
     }
 
     static McdrSetupScreen.Status setupStatus(McdrSetup setup, InstallProgress progress) {
