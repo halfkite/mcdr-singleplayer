@@ -117,6 +117,7 @@ final class McdrSetupScreen extends Screen {
         if (view.status() == Status.FAILED) return "mcdr-singleplayer.setup.failed";
         return switch (view.reason()) {
             case McdrSetup.PYTHON_MISSING -> "mcdr-singleplayer.setup.python_missing";
+            case McdrSetup.PIP_MISSING -> "mcdr-singleplayer.setup.pip_missing";
             case "missing" -> "mcdr-singleplayer.setup.missing";
             case "outdated" -> "mcdr-singleplayer.setup.outdated";
             case "plugin" -> "mcdr-singleplayer.setup.plugin_outdated";

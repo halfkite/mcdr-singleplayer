@@ -77,6 +77,17 @@ class McdrProbeTest {
         assertNull(AutoRuntime.pluginVersion(directory.resolve("absent.mcdr")));
     }
 
+    @Test void thePipProbeReadsTheExitCodeOfTheInterpreter() {
+        // Python without pip must be reported separately, so the probe cannot rely on the
+        // interpreter existing: it asks that interpreter to report pip and trusts the exit code.
+        boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("windows");
+        Path java = Path.of(System.getProperty("java.home"), "bin", windows ? "java.exe" : "java");
+        assertTrue(AutoRuntime.pipAvailable(java.util.List.of(java.toString(), "-version"), 20));
+        assertFalse(AutoRuntime.pipAvailable(java.util.List.of(java.toString(), "--not-a-real-flag"), 20));
+        assertFalse(AutoRuntime.pipAvailable(
+                java.util.List.of(java.resolveSibling("absent-python").toString(), "-m", "pip", "--version"), 5));
+    }
+
     private static Path config(Path game) {
         return game.resolve("mcdr-singleplayer/mcdr-singleplayer-config.yml");
     }

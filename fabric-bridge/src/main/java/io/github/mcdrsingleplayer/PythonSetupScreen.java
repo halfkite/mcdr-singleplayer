@@ -14,17 +14,33 @@ final class PythonSetupScreen extends Screen {
     private static final String WINDOWS_MIRROR = "https://mirrors.aliyun.com/python-release/windows/python-3.14.8-amd64.exe";
     private static final String DOWNLOADS_PAGE = "https://www.python.org/downloads/";
     private final Runnable onDismiss;
+    /** Python exists but cannot install packages, so the wording and the instructions differ. */
+    private final boolean pip;
 
     PythonSetupScreen(Runnable onDismiss) {
-        super(Component.translatable("mcdr-singleplayer.python.required_title"));
+        this(onDismiss, false);
+    }
+
+    PythonSetupScreen(Runnable onDismiss, boolean pip) {
+        super(Component.translatable(pip
+                ? "mcdr-singleplayer.python.pip_title" : "mcdr-singleplayer.python.required_title"));
         this.onDismiss = onDismiss;
+        this.pip = pip;
+    }
+
+    private String introKey() {
+        return pip ? "mcdr-singleplayer.python.pip_intro" : "mcdr-singleplayer.python.required_intro";
+    }
+
+    private String instructionsKey() {
+        return pip ? "mcdr-singleplayer.python.pip_instructions" : "mcdr-singleplayer.python.install_instructions";
     }
 
     @Override
     protected void init() {
         int textWidth = Math.min(360, width - 40);
-        var intro = font.split(Component.translatable("mcdr-singleplayer.python.required_intro"), textWidth);
-        var instructions = font.split(Component.translatable("mcdr-singleplayer.python.install_instructions"), textWidth);
+        var intro = font.split(Component.translatable(introKey()), textWidth);
+        var instructions = font.split(Component.translatable(instructionsKey()), textWidth);
         var version = Component.translatable("mcdr-singleplayer.python.latest_stable", PYTHON_VERSION);
         int versionLines = font.split(version, textWidth).size();
         int buttonCount = windowsX64() ? 3 : 1;
@@ -57,8 +73,8 @@ final class PythonSetupScreen extends Screen {
         int panelWidth = Math.min(400, width - 24);
         int panelLeft = (width - panelWidth) / 2;
         int textWidth = Math.min(360, width - 40);
-        var intro = font.split(Component.translatable("mcdr-singleplayer.python.required_intro"), textWidth);
-        var instructions = font.split(Component.translatable("mcdr-singleplayer.python.install_instructions"), textWidth);
+        var intro = font.split(Component.translatable(introKey()), textWidth);
+        var instructions = font.split(Component.translatable(instructionsKey()), textWidth);
         var version = font.split(Component.translatable("mcdr-singleplayer.python.latest_stable", PYTHON_VERSION), textWidth);
         int buttonCount = windowsX64() ? 3 : 1;
         int contentHeight = 46 + intro.size() * 10 + 8 + version.size() * 10 + 8

@@ -39,7 +39,7 @@ final class AutoRuntime {
     private long stalledModified;
     private int stalledValue;
 
-    private enum PythonStatus { CHECKING, MISSING, READY }
+    private enum PythonStatus { CHECKING, MISSING, PIP_MISSING, READY }
 
     private record SetupCheck(boolean ready, String reason) { }
 
@@ -84,6 +84,8 @@ final class AutoRuntime {
     }
 
     boolean pythonMissing() { return pythonStatus == PythonStatus.MISSING; }
+    /** An interpreter without pip cannot build the runtime, so it is reported on its own. */
+    boolean pipMissing() { return pythonStatus == PythonStatus.PIP_MISSING; }
     boolean pythonReady() { return pythonStatus == PythonStatus.READY; }
     boolean pythonChecking() { return pythonStatus == PythonStatus.CHECKING; }
     boolean autoInstallEnabled() { return config.autoInstall; }
@@ -129,7 +131,24 @@ final class AutoRuntime {
     List<String> consoleTail(int limit) {
         Path path = stateFile.resolveSibling("console.log");
         try {
-            String text = new String(Files.readAllBytes(path), java.nio.charset.StandardCharsets.UTF_8);
+            // Only the tail is needed, and this runs on the render thread: read at most 64 KiB and
+            // drop the partial first line so a line boundary is never cut in half.
+            byte[] data;
+            try (var channel = java.nio.channels.FileChannel.open(path, java.nio.file.StandardOpenOption.READ)) {
+                long size = channel.size();
+                int read = (int) Math.min(size, 64 * 1024);
+                java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(read);
+                channel.position(Math.max(0, size - read));
+                while (buffer.hasRemaining() && channel.read(buffer) > 0) {
+                    // keep filling
+                }
+                data = buffer.array();
+            }
+            String text = new String(data, java.nio.charset.StandardCharsets.UTF_8);
+            if (data.length == 64 * 1024) {
+                int boundary = text.indexOf('\n');
+                if (boundary >= 0) text = text.substring(boundary + 1);
+            }
             String[] all = text.split("\r?\n");
             int from = Math.max(0, all.length - limit);
             return List.of(all).subList(from, all.length);
@@ -248,6 +267,14 @@ final class AutoRuntime {
                 Thread.sleep(SETUP_RECHECK_MILLIS);
                 continue;
             }
+            if (!pythonHasPip(python)) {
+                pythonStatus = PythonStatus.PIP_MISSING;
+                // The interpreter alone is not enough: without pip the runtime cannot be installed.
+                setup.check(McdrSetup.PIP_MISSING);
+                setup.write();
+                Thread.sleep(SETUP_RECHECK_MILLIS);
+                continue;
+            }
             pythonStatus = PythonStatus.READY;
             SetupCheck check = probe();
             setup.check(check.reason());
@@ -330,6 +357,13 @@ final class AutoRuntime {
                 setup.write();
                 return;
             }
+            if (!pythonHasPip(python)) {
+                // Starting the installer without pip would only produce a failed install.
+                pythonStatus = PythonStatus.PIP_MISSING;
+                setup.check(McdrSetup.PIP_MISSING);
+                setup.write();
+                return;
+            }
             pythonStatus = PythonStatus.READY;
             List<String> command;
             if (config.autoInstall) command = new ArrayList<>(List.of(python, resources.resolve("bridge_bootstrap.py").toString(),
@@ -404,9 +438,35 @@ final class AutoRuntime {
     private String detectPython() {
         String python = findPython();
         if (python == null && pythonStatus != PythonStatus.MISSING) {
-            LOGGER.info("Python 3.10 or newer with pip was not found; waiting for installation");
+            LOGGER.info("Python 3.10 or newer was not found; waiting for installation");
         }
         return python;
+    }
+
+    /**
+     * Whether that interpreter can install packages. A pip-less Python used to look exactly like a
+     * missing one, because the old probe imported pip to qualify a candidate at all.
+     */
+    private boolean pythonHasPip(String python) {
+        return pipAvailable(List.of(python, "-m", "pip", "--version"), 6);
+    }
+
+    /** Run a probe command and report its exit code; anything unusual counts as "not available". */
+    static boolean pipAvailable(List<String> command, long timeoutSeconds) {
+        try {
+            Process check = new ProcessBuilder(command).redirectErrorStream(true).start();
+            check.getInputStream().readAllBytes();
+            if (!check.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
+                check.destroyForcibly();
+                return false;
+            }
+            return check.exitValue() == 0;
+        } catch (IOException e) {
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 
     private String findPython() {
@@ -420,7 +480,7 @@ final class AutoRuntime {
         candidates.add(List.of("python"));
         for (var candidate : candidates) {
             List<String> command = new ArrayList<>(candidate);
-            command.addAll(List.of("-c", "import sys, pip; assert sys.version_info >= (3, 10); print(sys.executable)"));
+            command.addAll(List.of("-c", "import sys; assert sys.version_info >= (3, 10); print(sys.executable)"));
             try {
                 Process check = new ProcessBuilder(command).redirectErrorStream(true).start();
                 if (!check.waitFor(4, TimeUnit.SECONDS)) { check.destroyForcibly(); continue; }

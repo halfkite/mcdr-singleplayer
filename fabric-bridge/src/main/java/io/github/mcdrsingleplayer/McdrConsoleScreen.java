@@ -64,11 +64,13 @@ final class McdrConsoleScreen extends Screen {
             submit();
             return true;
         }
-        if (keyCode == 265) {  // Up
+        // Arrow keys scroll the log only while the command line is not focused.
+        boolean typing = input != null && input.isFocused();
+        if (!typing && keyCode == 265) {  // Up
             scroll++;
             return true;
         }
-        if (keyCode == 264) {  // Down
+        if (!typing && keyCode == 264) {  // Down
             scroll = Math.max(0, scroll - 1);
             return true;
         }

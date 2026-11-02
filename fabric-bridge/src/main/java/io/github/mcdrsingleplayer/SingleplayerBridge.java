@@ -155,13 +155,13 @@ public final class SingleplayerBridge implements ModInitializer {
             if (menuButton != null) menuButton.refresh();
             if (runtime != null) {
                 boolean inSingleplayer = inSingleplayer(client);
-                if (runtime.pythonMissing() && inSingleplayer) {
+                if ((runtime.pythonMissing() || runtime.pipMissing()) && inSingleplayer) {
                     if (!showingPythonPrompt && !pythonPromptDismissed) {
                         showingPythonPrompt = true;
                         client.gui.setScreen(new PythonSetupScreen(() -> {
                             showingPythonPrompt = false;
                             pythonPromptDismissed = true;
-                        }));
+                        }, runtime.pipMissing()));
                     }
                 } else if (!inSingleplayer) {
                     if ((showingPythonPrompt && client.gui.screen() instanceof PythonSetupScreen)) client.gui.setScreen(null);
@@ -264,7 +264,7 @@ public final class SingleplayerBridge implements ModInitializer {
             @Override public void openPython() {
                 client.gui.setScreen(new PythonSetupScreen(() -> {
                     if (dismissAfterClose) mcdrSetupPromptDismissed = true;
-                }));
+                }, runtime.pipMissing()));
             }
 
             @Override public void dismiss() {
@@ -297,6 +297,8 @@ public final class SingleplayerBridge implements ModInitializer {
         String reason = setup.reason();
         if (McdrSetup.READY.equals(reason)) return McdrSetupScreen.Status.READY;
         if (McdrSetup.PYTHON_MISSING.equals(reason)) return McdrSetupScreen.Status.NEEDS_PYTHON;
+        // A pip-less interpreter needs the same help screen, only with its own explanation.
+        if (McdrSetup.PIP_MISSING.equals(reason)) return McdrSetupScreen.Status.NEEDS_PYTHON;
         if (setup.running()) {
             if (progress.stage().equals("failed")) return McdrSetupScreen.Status.FAILED;
             // The controller reaches this stage with MCDR fully prepared and waiting for a world.
