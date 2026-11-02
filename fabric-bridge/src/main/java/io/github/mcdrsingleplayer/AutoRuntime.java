@@ -125,6 +125,33 @@ final class AutoRuntime {
         }
     }
 
+    /** The newest console lines the controller mirrored for this client. */
+    List<String> consoleTail(int limit) {
+        Path path = stateFile.resolveSibling("console.log");
+        try {
+            String text = new String(Files.readAllBytes(path), java.nio.charset.StandardCharsets.UTF_8);
+            String[] all = text.split("\r?\n");
+            int from = Math.max(0, all.length - limit);
+            return List.of(all).subList(from, all.length);
+        } catch (IOException | RuntimeException e) {
+            return List.of();
+        }
+    }
+
+    /** Hand a console command to the controller, which types it into the running MCDR. */
+    void consoleCommand(String command) {
+        String line = command.replace("\r", "").replace("\n", "");
+        if (line.isBlank()) return;
+        try {
+            Files.createDirectories(stateFile.getParent());
+            Files.writeString(stateFile.resolveSibling("console-command.txt"), line + "\n",
+                    java.nio.charset.StandardCharsets.UTF_8,
+                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            LOGGER.warn("Could not send a command to the MCDR console", e);
+        }
+    }
+
     /** Installs MCDR after the user accepted the download from the main menu. */
     void requestInstall() {
         if (setup == null) return;

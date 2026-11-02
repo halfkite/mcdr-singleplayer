@@ -81,6 +81,65 @@ class ChildLog:
             self.stream = None
 
 
+class ConsoleMirror:
+    """Live copy of the child's console that the game can display.
+
+    The per-world log is an archive that rotates; this one stays small and follows the child across
+    worlds, so the console screen always shows the newest lines of the running MCDR.
+    """
+
+    def __init__(self, path, limit=256 * 1024):
+        self.path = Path(path)
+        self.limit = limit
+        self.stream = None
+        self.written = 0
+        self._open()
+
+    def _open(self):
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.written = self.path.stat().st_size if self.path.is_file() else 0
+            self.stream = self.path.open('a', encoding='utf8')
+        except OSError:
+            self.stream = None
+
+    def write(self, text):
+        if self.stream is None:
+            return
+        try:
+            self.stream.write(text)
+            self.stream.flush()
+        except (OSError, ValueError):
+            return
+        self.written += len(text.encode('utf8', 'ignore'))
+        if self.written >= self.limit:
+            self._trim()
+
+    def _trim(self):
+        """Keep the newest half, starting on a line boundary."""
+        try:
+            self.stream.close()
+        except (OSError, ValueError):
+            pass
+        try:
+            data = self.path.read_bytes()[-self.limit // 2:]
+            boundary = data.find(b'\n')
+            if boundary >= 0:
+                data = data[boundary + 1:]
+            self.path.write_bytes(data)
+        except OSError:
+            pass
+        self._open()
+
+    def close(self):
+        if self.stream is not None:
+            try:
+                self.stream.close()
+            except OSError:
+                pass
+            self.stream = None
+
+
 class ChildReader(threading.Thread):
     """Drain the child's console into ChildLog and stop a repeating flood.
 
@@ -90,11 +149,12 @@ class ChildReader(threading.Thread):
     terminated once one message fills the window.
     """
 
-    def __init__(self, stream, log, on_flood):
+    def __init__(self, stream, log, on_flood, mirror=None):
         super().__init__(name='mcdr-console', daemon=True)
         self.stream = stream
         self.log = log
         self.on_flood = on_flood
+        self.mirror = mirror
         # Enough room for the alternating pair to reach the limit twice per window.
         self.window = collections.deque(maxlen=max(REPEAT_LIMIT * 2, 64))
         self.counts = collections.Counter()
@@ -105,6 +165,8 @@ class ChildReader(threading.Thread):
             for line in self.stream:
                 if not self.flooded:
                     self.log.write(line)
+                    if self.mirror is not None:
+                        self.mirror.write(line)
                 self._count(line.strip())
         except (OSError, ValueError):
             pass
@@ -350,6 +412,9 @@ class Controller:
         if self.reader is not None:
             self.reader.join(timeout=5)
             self.reader = None
+        if self.mirror is not None:
+            self.mirror.close()
+            self.mirror = None
         if self.output is not None:
             self.output.close()
             self.output = None
@@ -388,6 +453,26 @@ class Controller:
             logging.warning('The player asked to stop MCDR before its tasks finished; terminating it')
             self._wait_or_kill(0)
 
+    def _apply_console_commands(self):
+        """Type the commands the in-game console collected into the running MCDR."""
+        path = Path(self.state_file).parent / 'console-command.txt'
+        if not path.exists() or not self.process or self.process.poll() is not None:
+            return
+        try:
+            text = path.read_text(encoding='utf8')
+            path.unlink()
+        except OSError:
+            return
+        for line in text.splitlines()[:32]:
+            command = line.strip()
+            if not command:
+                continue
+            try:
+                self.process.stdin.write(command + '\n')
+                self.process.stdin.flush()
+            except (OSError, BrokenPipeError):
+                return
+
     def _flood_detected(self, text):
         """The child is looping on an empty command; stop it instead of filling the disk."""
         logging.error('MCDR console repeated one line %d times (%s); terminating it',
@@ -418,6 +503,7 @@ class Controller:
         # stop it; the controller never ends a backup or restore on its own.
         self._publish_retire_state()
         self._apply_terminate_request()
+        self._apply_console_commands()
         desired = state.get('session') if state.get('world_path') else None
         if self.process and desired != self.session:
             self.retire()
@@ -457,8 +543,11 @@ class Controller:
                     stderr=subprocess.STDOUT, text=True, encoding='utf8',
                     creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
                 # The console is drained on a thread so the log can be capped and a runaway child
-                # can be stopped, which a direct file handle could not do.
-                self.reader = ChildReader(self.process.stdout, self.output, self._flood_detected)
+                # can be stopped, which a direct file handle could not do. The mirror is what the
+                # in-game console screen reads.
+                self.mirror = ConsoleMirror(Path(self.state_file).parent / 'console.log')
+                self.reader = ChildReader(self.process.stdout, self.output, self._flood_detected,
+                                          mirror=self.mirror)
                 self.reader.start()
                 logging.info('MCDR profile started: %s', profile.name)
             elif self.lease:

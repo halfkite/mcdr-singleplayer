@@ -271,6 +271,8 @@ public final class SingleplayerBridge implements ModInitializer {
                 if (dismissAfterClose) mcdrSetupPromptDismissed = true;
             }
 
+            @Override public void openConsole() { showConsole(client); }
+
             @Override public void terminate() {
                 mcdrRetirePromptShown = true;
                 runtime.requestTerminate();
@@ -379,12 +381,24 @@ public final class SingleplayerBridge implements ModInitializer {
                 .orElse(BUNDLED_VERSION);
     }
 
+    /** Opens the running MCDR console; the command reaches it without going through the menu. */
+    private void showConsole(Minecraft client) {
+        client.gui.setScreen(new McdrConsoleScreen(new McdrConsoleScreen.Behaviour() {
+            @Override public java.util.List<String> lines(int limit) { return runtime.consoleTail(limit); }
+
+            @Override public void send(String command) { runtime.consoleCommand(command); }
+        }));
+    }
+
     private void registerClientCommands() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> {
             clientCommands.attach(dispatcher);
             dispatcher.register(ClientCommands.literal("mcdr_setup").requires(FabricClientCommandSource::attended)
                     .then(ClientCommands.literal("recommend").executes(command -> setup(command.getSource(), "recommend")))
                     .then(ClientCommands.literal("owner").executes(command -> setup(command.getSource(), "owner"))));
+            dispatcher.register(ClientCommands.literal("mcdr_console")
+                    .requires(FabricClientCommandSource::attended)
+                    .executes(command -> { showConsole(client); return 1; }));
         });
     }
 

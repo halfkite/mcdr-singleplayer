@@ -27,6 +27,8 @@ final class McdrSetupScreen extends Screen {
         void dismiss();
         /** Ends MCDR although it is still finishing a backup or restore. */
         default void terminate() { }
+        /** Shows the running MCDR console. */
+        default void openConsole() { }
     }
 
     private final Behaviour behaviour;
@@ -58,8 +60,12 @@ final class McdrSetupScreen extends Screen {
                     button -> behaviour.install()).bounds(center, height - 56, buttonWidth, 20).build());
         }
         boolean hasPrimary = needsPython || downloadable || stalled;
+        int rowY = hasPrimary ? height - 32 : height - 48;
+        int half = buttonWidth / 2 - 2;
+        addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.console.button"),
+                button -> behaviour.openConsole()).bounds(center, rowY, half, 20).build());
         addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.setup.close"), button -> onClose())
-                .bounds(center, hasPrimary ? height - 32 : height - 48, buttonWidth, 20).build());
+                .bounds(center + half + 4, rowY, half, 20).build());
     }
 
     @Override

@@ -220,3 +220,27 @@ def test_the_player_can_stop_a_retiring_child(tmp_path, monkeypatch):
 
     assert process.code is not None, "the child has to be ended when the player asks for it"
     assert not (tmp_path / "terminate.request").exists(), "the request is consumed once"
+
+
+def test_the_console_mirror_keeps_the_newest_lines(tmp_path):
+    """The in-game console reads this file, so it must stay small and end with the newest line."""
+    path = tmp_path / "console.log"
+    mirror = supervisor.ConsoleMirror(path, limit=200)
+    for index in range(500):
+        mirror.write(f"line {index}\n")
+    mirror.close()
+
+    assert path.read_text(encoding="utf8").endswith("line 499\n")
+    assert path.stat().st_size <= 300, "the mirror must not grow without bound"
+
+
+def test_a_console_command_reaches_the_running_mcdr(tmp_path, monkeypatch):
+    common, guest, host, processes, stages = controllers(tmp_path, monkeypatch)
+    host.tick(world_state(tmp_path, "host-world", 25591))
+    process = host.process
+
+    (tmp_path / "console-command.txt").write_text("!!MCDR status\n", encoding="utf8")
+    host.tick({})
+
+    assert "!!MCDR status" in process.stdin.getvalue()
+    assert not (tmp_path / "console-command.txt").exists(), "the command is consumed once"
