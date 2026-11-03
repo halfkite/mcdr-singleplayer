@@ -27,8 +27,6 @@ final class McdrConsoleScreen extends Screen {
     private final List<String> lines = new ArrayList<>();
     private EditBox input;
     private long fetchedAt;
-    /** Lines scrolled up from the newest one. */
-    private int scroll;
 
     McdrConsoleScreen(Behaviour behaviour) {
         super(Component.translatable("mcdr-singleplayer.console.title"));
@@ -55,26 +53,6 @@ final class McdrConsoleScreen extends Screen {
         if (command.isEmpty()) return;
         behaviour.send(command);
         input.setValue("");
-        scroll = 0;
-    }
-
-    @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == 257 || keyCode == 335) {  // Enter, keypad Enter
-            submit();
-            return true;
-        }
-        // Arrow keys scroll the log only while the command line is not focused.
-        boolean typing = input != null && input.isFocused();
-        if (!typing && keyCode == 265) {  // Up
-            scroll++;
-            return true;
-        }
-        if (!typing && keyCode == 264) {  // Down
-            scroll = Math.max(0, scroll - 1);
-            return true;
-        }
-        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
@@ -102,12 +80,11 @@ final class McdrConsoleScreen extends Screen {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
     }
 
-    /** Newest {@code capacity} lines, honouring the scroll offset. */
+    /** Newest {@code capacity} lines; the console follows the tail. */
     private List<String> window(int capacity) {
         if (lines.isEmpty()) return List.of();
-        int end = Math.max(0, lines.size() - scroll);
-        int start = Math.max(0, end - capacity);
-        return lines.subList(start, end);
+        int start = Math.max(0, lines.size() - capacity);
+        return lines.subList(start, lines.size());
     }
 
     private void refresh() {
@@ -117,7 +94,6 @@ final class McdrConsoleScreen extends Screen {
         List<String> fresh = behaviour.lines(400);
         lines.clear();
         lines.addAll(fresh);
-        scroll = Math.min(scroll, Math.max(0, lines.size() - 1));
     }
 
     /** Long lines are cut so one message cannot push the rest off screen. */

@@ -208,7 +208,7 @@
   "mcdr-singleplayer.console.button": "Open console",
   "mcdr-singleplayer.console.input": "MCDR command",
   "mcdr-singleplayer.console.send": "Send",
-  "mcdr-singleplayer.console.hint": "Enter sends; \u2191\u2193 scroll, and !! commands typed in chat reach MCDR too",
+  "mcdr-singleplayer.console.hint": "Type a command and press Send; !! commands typed in chat reach MCDR too",
   "mcdr-singleplayer.console.empty": "No output yet: MCDR is not running or was just started",
   "mcdr-singleplayer.setup.python_download": "Download Python",
   "mcdr-singleplayer.setup.close": "Later",

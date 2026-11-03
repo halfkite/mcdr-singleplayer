@@ -208,7 +208,7 @@
   "mcdr-singleplayer.console.button": "打开控制台",
   "mcdr-singleplayer.console.input": "输入 MCDR 命令",
   "mcdr-singleplayer.console.send": "发送",
-  "mcdr-singleplayer.console.hint": "回车发送；↑↓ 翻阅历史，聊天框里的 !! 命令同样交给 MCDR",
+  "mcdr-singleplayer.console.hint": "输入命令后点「发送」交给 MCDR；聊天框里的 !! 命令同样会转发",
   "mcdr-singleplayer.console.empty": "暂无输出：MCDR 还没启动，或刚刚进入游戏",
   "mcdr-singleplayer.setup.python_download": "下载 Python",
   "mcdr-singleplayer.setup.close": "稍后",

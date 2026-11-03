@@ -208,7 +208,7 @@
   "mcdr-singleplayer.console.button": "開啟主控台",
   "mcdr-singleplayer.console.input": "輸入 MCDR 指令",
   "mcdr-singleplayer.console.send": "送出",
-  "mcdr-singleplayer.console.hint": "Enter 送出；↑↓ 翻閱歷史，聊天框的 !! 指令同樣交給 MCDR",
+  "mcdr-singleplayer.console.hint": "輸入指令後點「送出」交給 MCDR；聊天框的 !! 指令同樣會轉送",
   "mcdr-singleplayer.console.empty": "尚無輸出：MCDR 還沒啟動，或剛進入遊戲",
   "mcdr-singleplayer.setup.python_download": "下載 Python",
   "mcdr-singleplayer.setup.close": "稍後",

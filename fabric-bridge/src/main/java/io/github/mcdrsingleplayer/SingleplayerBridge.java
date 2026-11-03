@@ -400,7 +400,7 @@ public final class SingleplayerBridge implements ModInitializer {
                     .then(ClientCommands.literal("owner").executes(command -> setup(command.getSource(), "owner"))));
             dispatcher.register(ClientCommands.literal("mcdr_console")
                     .requires(FabricClientCommandSource::attended)
-                    .executes(command -> { showConsole(client); return 1; }));
+                    .executes(command -> { showConsole(Minecraft.getInstance()); return 1; }));
         });
     }
 
