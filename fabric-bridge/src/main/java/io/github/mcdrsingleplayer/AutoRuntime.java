@@ -174,26 +174,57 @@ final class AutoRuntime {
     }
 
     /**
-     * Open a real console window that follows the game and MCDR output.
+     * Open the console window: MCDR output on screen, and what is typed there goes back to MCDR.
      *
-     * This is the console a normal MCDR setup shows; the in-game panel only remains for systems
-     * without a console. It is a live reader and never writes into MCDR's input stream.
+     * The controller owns MCDR's stdin, so a window cannot attach to it directly. This runs the
+     * bridge's console front-end, which mirrors the recorded console and forwards every typed line
+     * to the controller — interactive, without handing a second process control of the server.
      */
     boolean openConsoleWindow() {
         if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("windows")) return false;
-        Path gameLog = gameDirectory.resolve("logs/latest.log");
-        Path mcdrLog = stateFile.resolveSibling("console.log");
-        String script = "Get-Content -Wait -Tail 200 -Path '" + gameLog + "','" + mcdrLog
-                + "' -ErrorAction SilentlyContinue";
+        Path script = consoleScript();
+        Path python = consolePython();
+        if (python == null || script == null) return false;
+        Path launcher = common.resolve("runtime/console-window.cmd");
+        String command = String.join(" ",
+                quote(python.toString()), quote(script.toString()),
+                "--console", quote(stateFile.resolveSibling("console.log").toString()),
+                "--commands", quote(stateFile.resolveSibling("console-command.txt").toString()),
+                "--watch", quote(gameDirectory.resolve("logs/latest.log").toString()),
+                "--title", quote("MCDR console"));
         try {
-            // start gives the window its own console; /k keeps it open after the tail is interrupted.
+            Files.createDirectories(launcher.getParent());
+            Files.writeString(launcher, "@echo off\r\nchcp 65001 > nul\r\n" + command + "\r\n",
+                    java.nio.charset.StandardCharsets.UTF_8);
+            // start gives the window its own console; /k keeps it open after the front-end exits.
             new ProcessBuilder("cmd.exe", "/c", "start", "MCDR console", "cmd.exe", "/k",
-                    "powershell", "-NoExit", "-Command", script).start();
+                    quote(launcher.toString())).start();
             return true;
         } catch (IOException e) {
             LOGGER.warn("Could not open the MCDR console window", e);
             return false;
         }
+    }
+
+    /** The console front-end, from the installed runtime or straight from the extracted bundle. */
+    private Path consoleScript() {
+        Path installed = common.resolve("runtime/bridge-runtime/console_window.py");
+        if (Files.isRegularFile(installed)) return installed;
+        Path bundled = common.resolve("runtime/bootstrap-resources-" + bridgeVersion)
+                .resolve("runtime/singleplayer_bridge/console_window.py");
+        return Files.isRegularFile(bundled) ? bundled : null;
+    }
+
+    /** The interpreter that already runs the bridge, falling back to the detected one. */
+    private Path consolePython() {        Path environment = common.resolve("runtime/.bridge-venv")
+                .resolve(isWindows() ? "Scripts/python.exe" : "bin/python");
+        if (Files.isRegularFile(environment)) return environment;
+        String detected = findPython();
+        return detected == null ? null : Path.of(detected);
+    }
+
+    private static String quote(String value) {
+        return '"' + value.replace("\"", "") + '"';
     }
 
     /** Installs MCDR after the user accepted the download from the main menu. */
