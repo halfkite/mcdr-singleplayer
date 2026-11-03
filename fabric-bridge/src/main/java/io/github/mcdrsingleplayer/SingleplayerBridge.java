@@ -385,6 +385,8 @@ public final class SingleplayerBridge implements ModInitializer {
 
     /** Opens the running MCDR console; the command reaches it without going through the menu. */
     private void showConsole(Minecraft client) {
+        // Windows gets the real console window the player expects; other systems keep the panel.
+        if (runtime.openConsoleWindow()) return;
         client.gui.setScreen(new McdrConsoleScreen(new McdrConsoleScreen.Behaviour() {
             @Override public java.util.List<String> lines(int limit) { return runtime.consoleTail(limit); }
 

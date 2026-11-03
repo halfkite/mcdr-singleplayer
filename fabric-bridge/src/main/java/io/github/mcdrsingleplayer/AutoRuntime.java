@@ -21,6 +21,7 @@ final class AutoRuntime {
     private final BridgeConfig config;
     private final Path gameConfig;
     private final Path stateFile;
+    private final Path gameDirectory;
     private final Path common;
     private final String bridgeVersion;
     private final String clientId = UUID.randomUUID().toString();
@@ -53,6 +54,7 @@ final class AutoRuntime {
         this.gameConfig = gameConfig.toAbsolutePath();
         this.bridgeVersion = stableVersion(bridgeVersion);
         this.stateFile = BridgeConfig.runtimeForGame(gameDirectory).resolve("clients").resolve(clientId).resolve("session.json");
+        this.gameDirectory = gameDirectory.toAbsolutePath();
         common = BridgeConfig.rootForGame(gameDirectory).toAbsolutePath().normalize();
         // Publish the initial "checking" state before the game can draw the menu.
         setup = new McdrSetup(stateFile.resolveSibling("setup-status.json"));
@@ -168,6 +170,29 @@ final class AutoRuntime {
                     java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
         } catch (IOException e) {
             LOGGER.warn("Could not send a command to the MCDR console", e);
+        }
+    }
+
+    /**
+     * Open a real console window that follows the game and MCDR output.
+     *
+     * This is the console a normal MCDR setup shows; the in-game panel only remains for systems
+     * without a console. It is a live reader and never writes into MCDR's input stream.
+     */
+    boolean openConsoleWindow() {
+        if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("windows")) return false;
+        Path gameLog = gameDirectory.resolve("logs/latest.log");
+        Path mcdrLog = stateFile.resolveSibling("console.log");
+        String script = "Get-Content -Wait -Tail 200 -Path '" + gameLog + "','" + mcdrLog
+                + "' -ErrorAction SilentlyContinue";
+        try {
+            // start gives the window its own console; /k keeps it open after the tail is interrupted.
+            new ProcessBuilder("cmd.exe", "/c", "start", "MCDR console", "cmd.exe", "/k",
+                    "powershell", "-NoExit", "-Command", script).start();
+            return true;
+        } catch (IOException e) {
+            LOGGER.warn("Could not open the MCDR console window", e);
+            return false;
         }
     }
 
