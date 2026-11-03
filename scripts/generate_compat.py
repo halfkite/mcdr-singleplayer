@@ -131,7 +131,8 @@ def adapt_java(text, name, row, loader):
                         'protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {')
                     text = text.replace('extractDefaultSprite(graphics);',
                                         'super.renderWidget(graphics, mouseX, mouseY, partialTick);')
-        if name in ('RestoreTitleScreenMixin.java', 'PythonSetupScreen.java', 'McdrSetupScreen.java'):
+        if name in ('RestoreTitleScreenMixin.java', 'PythonSetupScreen.java', 'McdrSetupScreen.java',
+                    'McdrConsoleScreen.java'):
             text = text.replace('GuiGraphicsExtractor', 'GuiGraphics').replace('extractRenderState', 'render')
             text = text.replace('graphics.centeredText', 'graphics.drawCenteredString')
         if name == 'RestoreBackupSelectionScreen.java':
