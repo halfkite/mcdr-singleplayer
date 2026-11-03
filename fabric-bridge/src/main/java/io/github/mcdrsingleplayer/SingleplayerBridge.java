@@ -316,6 +316,10 @@ public final class SingleplayerBridge implements ModInitializer {
     private void registerMenuButton() {
         net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.AFTER_INIT.register((client, screen, width, height) -> {
             LOGGER.info("Title screen event: screen={} size={}x{}", screen.getClass().getSimpleName(), width, height);
+            if (screen instanceof net.minecraft.client.gui.screens.PauseScreen) {
+                addConsoleEntry(client, screen, width, height);
+                return;
+            }
             if (!(screen instanceof TitleScreen)) return;
             MenuIconButton button = new MenuIconButton(0, 0, 20, pressed -> openMcdrSetup(client, false));
             button.visible = runtime != null;
@@ -330,6 +334,11 @@ public final class SingleplayerBridge implements ModInitializer {
     /** Same rules Flashback uses; the entry never lands on top of another mod's button. */
     private static void placeMenuButton(MenuIconButton button, java.util.List<AbstractWidget> widgets,
             int screenWidth, int screenHeight) {
+        placeMenuButton(button, widgets, screenWidth, screenHeight, "Menu entry placement");
+    }
+
+    private static void placeMenuButton(MenuIconButton button, java.util.List<AbstractWidget> widgets,
+            int screenWidth, int screenHeight, String marker) {
         java.util.List<MenuButtonPlacement.Box> boxes = new java.util.ArrayList<>(widgets.size());
         for (AbstractWidget widget : widgets) {
             boxes.add(new MenuButtonPlacement.Box(widget.getX(), widget.getY(), widget.getWidth(),
@@ -348,9 +357,20 @@ public final class SingleplayerBridge implements ModInitializer {
         }
         MenuButtonPlacement.Position position = MenuButtonPlacement.place(boxes, own, replay, screenWidth, screenHeight);
         // Release checks and the client test harness read this line to confirm the entry was placed.
-        LOGGER.info("Menu entry placement: screen={}x{} widgets={} replay={} chosen={}", screenWidth,
+        LOGGER.info("{}: screen={}x{} widgets={} replay={} chosen={}", marker, screenWidth,
                 screenHeight, widgets.size(), replay == null ? "absent" : replay, position);
         if (position != null) button.setPosition(position.x(), position.y());
+    }
+
+    /** The pause menu gets the same icon, wired to the console instead of the install prompt. */
+    private void addConsoleEntry(Minecraft client, Screen screen, int width, int height) {
+        if (runtime == null) return;
+        MenuIconButton button = new MenuIconButton(0, 0, 20, pressed -> showConsole(client),
+                "mcdr-singleplayer.console.button");
+        java.util.List<AbstractWidget> widgets = net.fabricmc.fabric.api.client.screen.v1.Screens.getWidgets(screen);
+        widgets.add(button);
+        button.refresh();
+        placeMenuButton(button, widgets, width, height, "Pause console entry");
     }
 
     /** Marks the menu entry while MCDR still needs a download or an update. */

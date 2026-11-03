@@ -44,8 +44,12 @@ final class MenuIconButton extends Button {
     private boolean needsAttention;
 
     MenuIconButton(int x, int y, int height, OnPress onPress) {
+        this(x, y, height, onPress, "mcdr-singleplayer.setup.button");
+    }
+
+    MenuIconButton(int x, int y, int height, OnPress onPress, String tooltipKey) {
         super(x, y, WIDTH, height, Component.empty(), onPress, DEFAULT_NARRATION);
-        setTooltip(Tooltip.create(Component.translatable("mcdr-singleplayer.setup.button")));
+        setTooltip(Tooltip.create(Component.translatable(tooltipKey)));
     }
 
     /** Only 26.x requires this; scripts/generate_compat.py rewrites it for the other API shapes. */
