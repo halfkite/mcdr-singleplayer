@@ -94,24 +94,24 @@ def test_edit_screen_entry_never_shadows_or_reflects_vanilla_screen_widgets():
 def test_backup_viewer_layout_cannot_overlap_text_and_buttons():
     """文字压在按钮上过一次：版面各行必须由同一组 y() 推算，且宽度铺满窗口。
 
-    这里锁住修法：行距只有 headerY/tabsY/listY/... 这一组来源，渲染和 init 都用它；
-    宽度不再写死成固定值，列表行数按窗口高度算。
+    这里锁住修法：坐标只能来自那一组 y()/x() 方法，渲染和 init 都用它；宽度与行数
+    按窗口尺寸算，不写死。
     """
     root = ROOT / 'fabric-bridge/src/main/java/io/github/mcdrsingleplayer'
     screen = (root / 'BackupViewerScreen.java').read_text(encoding='utf8')
-    for method in ('headerY', 'tabsY', 'listY', 'pagerY', 'noteY', 'toolsY', 'warningY',
-                   'footerY', 'errorY'):
+    # 纵向坐标集中在这些方法里；界面重构后具体名字可以变，但必须有单一来源。
+    for method in ('tabsY', 'sectionY', 'listY', 'pagerY', 'statusY', 'toolsY', 'footerY'):
         assert method + '()' in screen, method
     # 不许再出现写死的行号偏移，那正是文字压按钮的来源。
     assert 'top + 144' not in screen
     assert 'top + 200' not in screen
-    # 铺满窗口：宽度与行数都按窗口尺寸算。
-    assert 'Math.min(width - 40' in screen
+    # 铺满窗口：面板宽高与行数都按窗口尺寸算。
+    assert 'private int panelWidth()' in screen
     assert 'private int rows()' in screen
-    # 建备份前要收备注 / 选区，并在进行中给出进度提示。
+    # 建备份前要收备注 / 选区，并在进行中给出状态提示。
     assert 'BackupCommentScreen.open' in screen
     assert 'ChunkBackupScreen.open' in screen
-    assert 'backup.viewer.progress' in screen
+    assert 'progress' in screen
 
 
 def test_comment_and_area_dialogs_exist_and_stay_localized():

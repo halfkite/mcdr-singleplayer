@@ -48,7 +48,9 @@ python ./setup_chunk_backup.py --mcdr-dir 'D:/Minecraft/游戏实例/mcdr-single
 
 ## 离线回档与备份浏览
 
-存档列表的编辑界面里，点「查看存档」后切到「CB 备份」标签页，即可看到当前存档的 Chunk Backup 槽位：动态槽位、静态槽位和安全备份 `overwrite`。每条都带时间、备注、操作者、体积和维度，可翻页查看，选中后两次点击确认才回档。
+存档列表的编辑界面里，点「查看备份」后切到「CB 备份」标签页，即可看到当前存档的 Chunk Backup 槽位：动态槽位、静态槽位和安全备份 `overwrite`。界面采用备份管理面板样式：左侧列表，宽屏时右侧并排显示选中备份的详情（时间、大小、创建者、维度、备注、恢复状态），翻页显示页码。选中后两次点击确认才回档。
+
+这个标签页也能就地创建 CB 备份：按上游槽位布局写入 `slot1`，已有槽位依次后移，受 `max_dynamic_slot` / `max_static_slot` 限制。创建前可以指定维度与两个角的区块坐标，只备份与范围重叠的 region 文件；留空则备份整个维度。备份库尚未配置时，该页会出现「创建配置」按钮就地补出配置。
 
 这里的回档不需要 Chunk Backup 本体：模组不导入上游插件，而是按上游的槽位布局（`<storage_root>/<dynamic_storage|static_storage>/slotN/<世界名>/<维度>/<region|entities|poi>/` 加 `info.json`、`overwrite/`）自己读取和复制。因此即使插件升级、未加载或 MCDR 没有运行插件，备份仍然可见可回。
 

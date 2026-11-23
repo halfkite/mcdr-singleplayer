@@ -9,23 +9,26 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.network.chat.Component;
 
 /**
- * 浏览并回档一个存档的三类备份：Prime Backup、Chunk Backup 与游戏原版备份。
+ * 适用于 Minecraft 26.3 的原版风格存档备份管理面板。
  *
- * 打开编辑界面时存档锁被它持有，所以回档前先关掉编辑界面释放 session.lock，
- * 再让离线流程动文件。三个备份库各自独立读取，一个库缺失只显示该页的原因。
- *
- * 版面铺满游戏窗口：宽度按窗口取，列表行数按剩余高度算。各行 y 由 headerY() 一路
- * 推出来，渲染与布局共用同一套坐标，所以文字不会压在按钮上；窗口很矮时列表会自动
- * 少显示几行而不是把文字挤出去。
- *
- * 建备份前先收备注（PB）或维度与区块选区（CB），建的过程中显示进度提示。
+ * 仅负责展示目录快照和派发操作；读取、创建、恢复仍交给 BackupCatalogClient。
+ * 参考 Conflux Map 的中性灰直角边框与紧凑信息层级，保留原生按钮交互。
+ * 根据窗口尺寸自动切换双栏/单栏，避免长备注或错误消息覆盖操作按钮。
  */
 public final class BackupViewerScreen extends Screen {
-    private static final int ROW_HEIGHT = 20;
-    private static final int MIN_WIDTH = 340;
-    private static final int MIN_ROWS = 2;
-    private static final int MAX_ROWS = 9;
+    private static final int PANEL_MAX_WIDTH = 760;
+    private static final int ROW_HEIGHT = 26;
+    private static final int ROW_STEP = 31;
+    private static final int MAX_ROWS = 7;
+    private static final int PANEL = 0xf0181818;
+    private static final int BORDER = 0xff6b6b6b;
+    private static final int SECTION = 0xe0191919;
+    private static final int ACCENT = 0xffe4e4e4;
+    private static final int MUTED = 0xffaaaaaa;
+    private static final int ERROR = 0xffff7777;
+    private static final int WARNING = 0xffe4c883;
     private static final String[] TABS = {"prime", "chunk", "vanilla"};
+
     private final String world;
     private final Screen parent;
     private final BackupCatalogClient.Catalog catalog;
@@ -41,7 +44,7 @@ public final class BackupViewerScreen extends Screen {
         this(world, parent, null, "", "prime", 0, "", false);
     }
 
-    /** 编辑界面的入口；parent 是回退目标。 */
+    /** 编辑世界界面的入口；切换到恢复流程前由原版编辑界面释放存档锁。 */
     public static void open(String world, Screen parent) {
         Minecraft.getInstance().gui.setScreen(new BackupViewerScreen(world, parent));
     }
@@ -81,111 +84,104 @@ public final class BackupViewerScreen extends Screen {
         return new BackupViewerScreen(world, parent, catalog, error, nextTab, nextPage, nextSelected, nextArmed);
     }
 
-    /** 铺满窗口：左右各留一点边距，宽屏时不至于拉成一条。 */
-    private int column() {
-        return Math.max(MIN_WIDTH, Math.min(width - 40, Math.max(width - 120, 520)));
-    }
-
-    private int left() {
-        return width / 2 - column() / 2;
-    }
-
-    /** 列表行数按窗口高度自适应，至少两行，至多九行。 */
+    /** 屏幕自适应布局：没有侧栏的窄窗口保留完整的选择、翻页和操作流程。 */
+    private int panelWidth() { return Math.max(160, Math.min(PANEL_MAX_WIDTH, width - 16)); }
+    private int panelHeight() { return Math.max(190, Math.min(450, height - 14)); }
+    private int panelX() { return (width - panelWidth()) / 2; }
+    private int panelY() { return Math.max(4, (height - panelHeight()) / 2); }
+    private int panelBottom() { return panelY() + panelHeight(); }
+    private int contentX() { return panelX() + 12; }
+    private int contentWidth() { return panelWidth() - 24; }
+    private boolean split() { return panelWidth() >= 600 && panelHeight() >= 315; }
+    private boolean compact() { return panelHeight() < 315; }
+    private boolean tiny() { return panelHeight() < 240; }
+    private int listWidth() { return split() ? (contentWidth() * 55 / 100) - 6 : contentWidth(); }
+    private int detailX() { return contentX() + listWidth() + 12; }
+    private int detailWidth() { return contentWidth() - listWidth() - 12; }
+    private int tabsY() { return panelY() + (tiny() ? 27 : compact() ? 37 : 47); }
+    private int sectionY() { return tabsY() + (tiny() ? 23 : 27); }
+    private int listY() { return sectionY() + (tiny() ? 12 : 16); }
+    private int footerY() { return panelBottom() - (tiny() ? 27 : 30); }
+    private int toolsY() { return footerY() - (tiny() ? 24 : 29); }
+    private int statusY() { return toolsY() - (tiny() ? 12 : 16); }
+    private int pagerY() { return statusY() - (tiny() ? 24 : 27); }
     private int rows() {
-        int reserved = 16 + 26 + 26 + 26 + 24 + toolRows() * 24 + 12 + 18 + 26 + 16;
-        int available = Math.max(0, height - reserved);
-        return Math.max(MIN_ROWS, Math.min(MAX_ROWS, available / (ROW_HEIGHT + 2)));
+        int reserved = split() || tiny() ? 0 : 27;
+        return Math.max(1, Math.min(MAX_ROWS, (pagerY() - listY() - reserved - 4) / ROW_STEP));
     }
-
-    private int toolRows() {
-        // 打开备份文件夹 + 建立备份；配置缺失时再加一行创建配置。
-        if (catalog == null) return 0;
-        return store().error().isEmpty() || tab.equals("vanilla") ? 2 : 3;
+    private int safePage() {
+        if (catalog == null || entries().isEmpty()) return 0;
+        return Math.min(Math.max(page, 0), (entries().size() - 1) / rows());
     }
-
-    private int top() {
-        int total = 16 + 26 + rows() * (ROW_HEIGHT + 2) + 26 + 26 + 24
-            + toolRows() * 24 + 12 + 18 + 26;
-        return Math.max(6, (height - total) / 2);
-    }
-
-    private int tabsY() { return top() + 16; }
-    private int listY() { return tabsY() + 26; }
-    private int pagerY() { return listY() + rows() * (ROW_HEIGHT + 2) + 2; }
-    private int noteY() { return pagerY() + 26; }
-    private int toolsY() { return noteY() + 26; }
-    private int warningY() { return toolsY() + toolRows() * 24 + 12; }
-    private int footerY() { return warningY() + 18; }
-    private int errorY() { return footerY() + 26; }
 
     @Override protected void init() {
-        int column = column();
-        int x = left();
-        int tabWidth = (column - 8) / 3;
+        int x = contentX();
+        int tabWidth = (contentWidth() - 8) / TABS.length;
         for (int index = 0; index < TABS.length; index++) {
             String kind = TABS[index];
-            addRenderableWidget(Button.builder(tab(kind), button -> switchStore(kind))
-                .bounds(x + index * (tabWidth + 4), tabsY(), tabWidth, ROW_HEIGHT).build());
+            var button = addRenderableWidget(Button.builder(tab(kind), pressed -> switchStore(kind))
+                .bounds(x + index * (tabWidth + 4), tabsY(), tabWidth, 20).build());
+            button.active = catalog != null && !working && !tab.equals(kind);
         }
+
         if (catalog == null) {
             if (!loading) {
                 loading = true;
                 BackupCatalogClient.load(world, result -> {
                     if (Minecraft.getInstance().gui.screen() == this)
-                        Minecraft.getInstance().gui.setScreen(new BackupViewerScreen(world, parent, result, "",
+                        Minecraft.getInstance().gui.setScreen(new BackupViewerScreen(world, parent, result, error,
                             tab, 0, "", false));
                 });
             }
         } else {
-            int limit = Math.min(rows(), Math.max(0, entries().size() - page * rows()));
-            for (int offset = 0; offset < limit; offset++) {
-                var entry = entries().get(page * rows() + offset);
-                String label = (entry.ref().equals(selected) ? "> " : "") + row(entry);
-                addRenderableWidget(Button.builder(Component.literal(label), button ->
-                    Minecraft.getInstance().gui.setScreen(with(tab, page, entry.ref(), false)))
-                    .bounds(x, listY() + offset * (ROW_HEIGHT + 2), column, ROW_HEIGHT).build());
+            int actualPage = safePage();
+            int from = actualPage * rows();
+            int to = Math.min(entries().size(), from + rows());
+            for (int index = from; index < to; index++) {
+                BackupCatalogClient.Entry entry = entries().get(index);
+                int y = listY() + (index - from) * ROW_STEP;
+                var item = addRenderableWidget(Button.builder(Component.literal(rowLabel(entry)), pressed ->
+                    Minecraft.getInstance().gui.setScreen(with(tab, actualPage, entry.ref(), false)))
+                    .bounds(x, y, listWidth(), ROW_HEIGHT).build());
+                item.active = !working;
             }
-            var previous = addRenderableWidget(Button.builder(Component.literal("<"), button ->
-                Minecraft.getInstance().gui.setScreen(with(tab, page - 1, selected, false)))
-                .bounds(x, pagerY(), 32, ROW_HEIGHT).build());
-            previous.active = page > 0;
-            var next = addRenderableWidget(Button.builder(Component.literal(">"), button ->
-                Minecraft.getInstance().gui.setScreen(with(tab, page + 1, selected, false)))
-                .bounds(x + column - 32, pagerY(), 32, ROW_HEIGHT).build());
-            next.active = (page + 1) * rows() < entries().size();
+            var previous = addRenderableWidget(Button.builder(Component.literal("<"), pressed ->
+                Minecraft.getInstance().gui.setScreen(with(tab, actualPage - 1, selected, false)))
+                .bounds(x, pagerY(), 28, 20).build());
+            previous.active = actualPage > 0 && !working;
+            var next = addRenderableWidget(Button.builder(Component.literal(">"), pressed ->
+                Minecraft.getInstance().gui.setScreen(with(tab, actualPage + 1, selected, false)))
+                .bounds(x + listWidth() - 28, pagerY(), 28, 20).build());
+            next.active = (actualPage + 1) * rows() < entries().size() && !working;
 
-            int tools = toolsY();
+            int half = (contentWidth() - 6) / 2;
             boolean configured = store().error().isEmpty();
+            boolean requiresSetup = !tab.equals("vanilla") && !configured;
             var make = addRenderableWidget(Button.builder(
-                Component.translatable("mcdr-singleplayer.backup.viewer.make_backup." + tab),
-                button -> makeBackup()).bounds(x, tools, column, ROW_HEIGHT).build());
-            make.active = configured && !working;
-            tools += 24;
-            if (!tab.equals("vanilla") && !configured) {
-                addRenderableWidget(Button.builder(
-                    Component.translatable("mcdr-singleplayer.backup.viewer.create_config"),
-                    button -> createConfig()).bounds(x, tools, column, ROW_HEIGHT).build());
-                tools += 24;
-            }
-            addRenderableWidget(Button.builder(
-                Component.translatable("mcdr-singleplayer.backup.viewer.open_folder"), button -> openFolder())
-                .bounds(x, tools, column, ROW_HEIGHT).build());
+                Component.translatable(requiresSetup ? "mcdr-singleplayer.backup.viewer.create_config"
+                    : "mcdr-singleplayer.backup.viewer.make_backup." + tab),
+                pressed -> { if (requiresSetup) createConfig(); else makeBackup(); })
+                .bounds(x, toolsY(), half, 20).build());
+            make.active = !working && (configured || requiresSetup);
+            var folder = addRenderableWidget(Button.builder(
+                Component.translatable("mcdr-singleplayer.backup.viewer.open_folder"),
+                pressed -> openFolder()).bounds(x + half + 6, toolsY(), contentWidth() - half - 6, 20).build());
+            folder.active = !working;
         }
-        addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.backup.viewer.back"), button ->
-            onClose()).bounds(x, footerY(), 100, ROW_HEIGHT).build());
-        var chosen = chosen();
-        var confirm = addRenderableWidget(Button.builder(
-            Component.translatable(armed ? "mcdr-singleplayer.backup.viewer.confirm_armed"
-                : "mcdr-singleplayer.backup.viewer.confirm"), button -> restore())
-            .bounds(x + 104, footerY(), column - 104, ROW_HEIGHT).build());
-        confirm.active = chosen != null && chosen.restorable() && error.isEmpty() && !working;
+
+        int backWidth = Math.min(104, Math.max(55, contentWidth() / 3));
+        addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.backup.viewer.back"),
+            pressed -> onClose()).bounds(x, footerY(), backWidth, 20).build());
+        var selection = chosen();
+        var confirm = addRenderableWidget(Button.builder(Component.translatable(
+            armed ? "mcdr-singleplayer.backup.viewer.confirm_armed"
+                : "mcdr-singleplayer.backup.viewer.confirm"), pressed -> restore())
+            .bounds(x + backWidth + 6, footerY(), contentWidth() - backWidth - 6, 20).build());
+        confirm.active = selection != null && selection.restorable() && error.isEmpty() && !working;
     }
 
-    /** 一个标签页；当前页用 » 前缀区分。 */
     private Component tab(String kind) {
-        Component label = Component.translatable("mcdr-singleplayer.backup.viewer.tab." + kind, count(kind));
-        return tab.equals(kind)
-            ? Component.empty().append(Component.literal("» ")).append(label) : label;
+        return Component.translatable("mcdr-singleplayer.backup.viewer.tab." + kind, count(kind));
     }
 
     private int count(String kind) {
@@ -197,8 +193,15 @@ public final class BackupViewerScreen extends Screen {
         };
     }
 
+    private String rowLabel(BackupCatalogClient.Entry entry) {
+        String date = entry.date().isBlank() ? entry.ref() : entry.date();
+        String comment = entry.comment().isBlank() ? "" : "  ·  " + entry.comment();
+        String symbol = entry.ref().equals(selected) ? "> " : "  ";
+        return fit(symbol + date + comment, listWidth() - 22);
+    }
+
     private void switchStore(String nextTab) {
-        if (catalog == null) return;
+        if (catalog == null || working) return;
         String nextError = switch (nextTab) {
             case "chunk" -> catalog.chunk().error();
             case "vanilla" -> catalog.vanilla().error();
@@ -211,16 +214,16 @@ public final class BackupViewerScreen extends Screen {
     private void createConfig() {
         if (working) return;
         working = true;
+        BackupViewerScreen pending = with(tab, safePage(), selected, false);
+        pending.working = true;
+        Minecraft.getInstance().gui.setScreen(pending);
         BackupCatalogClient.setup(world, tab.equals("chunk"), failure -> {
-            if (Minecraft.getInstance().gui.screen() != this) return;
+            if (Minecraft.getInstance().gui.screen() != pending) return;
             Minecraft.getInstance().gui.setScreen(new BackupViewerScreen(world, parent,
                 failure.isEmpty() ? null : catalog, failure, tab, 0, "", false));
         });
     }
 
-    /**
-     * 建备份：先收备注（PB）或维度与选区（CB），再交给离线流程，期间显示进度。
-     */
     private void makeBackup() {
         if (working || catalog == null || !store().error().isEmpty()) return;
         if (tab.equals("vanilla")) {
@@ -229,90 +232,72 @@ public final class BackupViewerScreen extends Screen {
         }
         if (tab.equals("chunk")) {
             ChunkBackupScreen.open(this, dimensions(), (dimension, region, comment) -> {
-                if (dimension == null) return;  // 取消
-                runCreate(comment, dimension, region == null ? "" : join(region));
+                if (dimension != null) runCreate(comment, dimension, region == null ? "" : join(region));
             });
             return;
         }
         BackupCommentScreen.open(this, "mcdr-singleplayer.backup.viewer.make_backup.prime",
-            comment -> {
-                if (comment == null) return;  // 取消
-                runCreate(comment, null, "");
-            });
+            comment -> { if (comment != null) runCreate(comment, null, ""); });
     }
 
     private static String join(int[] region) {
         return region[0] + "," + region[1] + "," + region[2] + "," + region[3];
     }
 
-    /** 当前存档 CB 配置里声明的维度，供选区界面切换。 */
     private List<String> dimensions() {
-        var chosen = chosen();
-        if (chosen != null && !chosen.dimensions().isEmpty()) return chosen.dimensions();
-        // 列表为空时给常见维度，备份器会用配置里的维度表校验。
+        var selection = chosen();
+        if (selection != null && !selection.dimensions().isEmpty()) return selection.dimensions();
         return List.of("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end");
     }
 
     private void runCreate(String comment, String dimension, String region) {
         int[] bounds = null;
         if (region != null && !region.isEmpty()) {
-            var parts = region.split(",");
+            String[] parts = region.split(",");
             bounds = new int[parts.length];
-            for (int index = 0; index < parts.length; index++) bounds[index] = Integer.parseInt(parts[index]);
+            for (int i = 0; i < parts.length; i++) bounds[i] = Integer.parseInt(parts[i]);
         }
-        int[] region_bounds = bounds;
-        // 进度提示由 working 标记在标题下方显示，直到任务返回。
+        // 新界面继承处理中状态，避免创建期间误以为按钮失效或可以再次点击。
+        BackupViewerScreen pending = with(tab, safePage(), selected, false);
+        pending.working = true;
+        Minecraft.getInstance().gui.setScreen(pending);
         java.util.function.Consumer<String> done = failure -> {
-            if (!(Minecraft.getInstance().gui.screen() instanceof BackupViewerScreen)) return;
+            if (Minecraft.getInstance().gui.screen() != pending) return;
             Minecraft.getInstance().gui.setScreen(new BackupViewerScreen(world, parent,
                 failure.isEmpty() ? null : catalog, failure, tab, 0, "", false));
         };
-        working = true;
-        if (Minecraft.getInstance().gui.screen() == this)
-            Minecraft.getInstance().gui.setScreen(new BackupViewerScreen(world, parent, catalog, error,
-                tab, page, selected, false));
         if (tab.equals("vanilla")) {
             BackupCatalogClient.createVanilla(world, done);
-            return;
+        } else {
+            BackupCatalogClient.create(world, tab.equals("chunk"), comment == null ? "" : comment,
+                dimension, bounds, done);
         }
-        BackupCatalogClient.create(world, tab.equals("chunk"), comment == null ? "" : comment,
-            dimension, region_bounds, done);
     }
 
     private void openFolder() {
+        if (working) return;
         BackupCatalogClient.open(world, tab, failure -> {
             if (failure.isEmpty() || Minecraft.getInstance().gui.screen() != this) return;
             Minecraft.getInstance().gui.setScreen(new BackupViewerScreen(world, parent, catalog, failure,
-                tab, page, selected, false));
+                tab, safePage(), selected, false));
         });
     }
 
-    private static String row(BackupCatalogClient.Entry entry) {
-        String comment = entry.comment();
-        if (comment.length() > 30) comment = comment.substring(0, 30) + "…";
-        String tag = switch (entry.kind()) {
-            case "prime" -> entry.safety() ? "P*" : "P";
-            case "vanilla" -> "V";
-            default -> "C";
-        };
-        return tag + "  " + entry.date() + "  " + comment;
-    }
-
     private void restore() {
-        var chosen = chosen();
-        if (catalog == null || chosen == null || !chosen.restorable() || !error.isEmpty() || working) return;
+        var selection = chosen();
+        if (catalog == null || selection == null || !selection.restorable() || !error.isEmpty() || working) return;
         if (RestoreProgressMonitor.blocks(world)) {
             Minecraft.getInstance().gui.setScreen(new BackupViewerScreen(world, parent, catalog,
-                "mcdr-singleplayer.backup.viewer.busy", tab, page, selected, false));
+                "mcdr-singleplayer.backup.viewer.busy", tab, safePage(), selected, false));
             return;
         }
         if (!armed) {
-            Minecraft.getInstance().gui.setScreen(with(tab, page, selected, true));
+            Minecraft.getInstance().gui.setScreen(with(tab, safePage(), selected, true));
             return;
         }
         if (parent instanceof net.minecraft.client.gui.screens.worldselection.EditWorldScreen) parent.onClose();
         Minecraft.getInstance().gui.setScreen(new TitleScreen());
-        BackupCatalogClient.restore(world, chosen.ref(), reason -> {
+        BackupCatalogClient.restore(world, selection.ref(), reason -> {
             if (Minecraft.getInstance().gui.screen() instanceof TitleScreen)
                 Minecraft.getInstance().gui.setScreen(new BackupViewerScreen(world, null, null, reason,
                     "prime", 0, "", false));
@@ -320,64 +305,157 @@ public final class BackupViewerScreen extends Screen {
     }
 
     @Override public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float ticks) {
-        int column = column();
-        graphics.fill(0, 0, width, height, 0xc0000000);
-        graphics.centeredText(font, title, width / 2, top(), 0xffffffff);
-        graphics.centeredText(font, Component.literal(world), width / 2, top() + 11, 0xff808080);
-        // 备份进行中：在标题下面显示进度，避免看起来像卡住。
-        if (working) {
-            graphics.centeredText(font, Component.translatable("mcdr-singleplayer.backup.viewer.progress"),
-                width / 2, tabsY() + 4, 0xffffcc66);
+        graphics.fill(0, 0, width, height, 0xc9000000);
+        box(graphics, panelX(), panelY(), panelWidth(), panelHeight(), PANEL, BORDER);
+        graphics.fill(panelX() + 1, panelY() + 1, panelX() + panelWidth() - 1, panelY() + 4, ACCENT);
+        graphics.centeredText(font, title, width / 2, panelY() + 11, 0xffffffff);
+        if (!tiny())
+            drawLeft(graphics, fit(world, contentWidth() - 6), contentX(), panelY() + 25, MUTED);
+        if (!compact()) {
+            graphics.fill(contentX(), tabsY() - 7, contentX() + contentWidth(), tabsY() - 6, BORDER);
+        }
+        if (catalog != null) {
+            String heading = tr("section.list", entries().size());
+            drawLeft(graphics, heading, contentX(), sectionY(), 0xffe6e6e6);
+            if (split()) {
+                box(graphics, detailX(), listY() - 3, detailWidth(), pagerY() - listY() + 25,
+                    SECTION, BORDER);
+                drawDetails(graphics, chosen());
+            } else if (!tiny()) {
+                drawCompactDetails(graphics, chosen());
+            }
+            int pages = Math.max(1, (entries().size() + rows() - 1) / rows());
+            graphics.centeredText(font, Component.translatable(
+                "mcdr-singleplayer.backup.viewer.page", safePage() + 1, pages),
+                contentX() + listWidth() / 2, pagerY() + 6, MUTED);
         }
 
-        int centre = listY() + (rows() * (ROW_HEIGHT + 2)) / 2 - 4;
+        int center = listY() + Math.max(0, pagerY() - listY()) / 2;
         if (catalog == null) {
             graphics.centeredText(font, Component.translatable("mcdr-singleplayer.backup.viewer.loading"),
-                width / 2, centre, 0xffaaaaaa);
+                contentX() + listWidth() / 2, center, MUTED);
         } else if (!store().error().isEmpty()) {
-            int y = centre - 10;
-            for (var line : font.split(localized(store().error()), column)) {
-                if (y > centre + 14) break;
-                graphics.centeredText(font, line, width / 2, y, 0xffff7777);
-                y += 10;
-            }
+            centeredLines(graphics, localized(store().error()), contentX() + listWidth() / 2,
+                center - 10, listWidth() - 12, 3, ERROR);
         } else if (entries().isEmpty()) {
-            graphics.centeredText(font, Component.translatable("mcdr-singleplayer.backup.viewer.empty",
+            centeredLines(graphics, Component.translatable("mcdr-singleplayer.backup.viewer.empty",
                 Component.translatable("mcdr-singleplayer.backup.viewer.tab." + tab, 0)),
-                width / 2, centre, 0xffaaaaaa);
+                contentX() + listWidth() / 2, center, listWidth() - 12, 3, MUTED);
         }
 
-        var chosen = chosen();
-        if (chosen != null) {
-            Component detail = chosen.restorable()
-                ? Component.translatable("mcdr-singleplayer.backup.viewer.detail", size(chosen.size()),
-                    String.join(", ", chosen.dimensions()))
-                : localized(chosen.reason());
-            graphics.centeredText(font, font.split(detail, column).get(0), width / 2, noteY(),
-                chosen.restorable() ? 0xffa0a0a0 : 0xffffcc66);
+        String message = working ? tr("progress") : !error.isEmpty() ? localized(error).getString()
+            : armed ? tr("confirm_armed") : tr("warning");
+        int color = !error.isEmpty() ? ERROR : working || armed ? WARNING : MUTED;
+        graphics.centeredText(font, Component.literal(fit(message, contentWidth() - 8)),
+            width / 2, statusY(), color);
+        super.extractRenderState(graphics, mouseX, mouseY, ticks);
+        // 原版按钮之上叠加轻量状态线，保留键盘、旁白和手柄的原生可访问交互。
+        int underlineWidth = (contentWidth() - 8) / TABS.length;
+        for (int index = 0; index < TABS.length; index++) {
+            if (!tab.equals(TABS[index])) continue;
+            int x = contentX() + index * (underlineWidth + 4);
+            graphics.fill(x + 3, tabsY() + 19, x + underlineWidth - 3, tabsY() + 21, ACCENT);
         }
-        graphics.centeredText(font, Component.translatable("mcdr-singleplayer.backup.viewer.warning"),
-            width / 2, warningY(), armed ? 0xffff7777 : 0xffffcc66);
-        if (!error.isEmpty()) {
-            int line = errorY();
-            for (var part : font.split(localized(error), column)) {
-                if (line > height - 10) break;
-                graphics.centeredText(font, part, width / 2, line, 0xffff7777);
-                line += 10;
+        if (catalog != null) {
+            int from = safePage() * rows();
+            int to = Math.min(entries().size(), from + rows());
+            for (int i = from; i < to; i++) {
+                var entry = entries().get(i);
+                if (!entry.ref().equals(selected)) continue;
+                int y = listY() + (i - from) * ROW_STEP;
+                graphics.fill(contentX() + 2, y + 3, contentX() + 5, y + ROW_HEIGHT - 3, ACCENT);
             }
         }
-        super.extractRenderState(graphics, mouseX, mouseY, ticks);
     }
 
-    private static Component localized(String text) {
-        return text.startsWith("mcdr-singleplayer.") ? Component.translatable(text) : Component.literal(text);
+    private void drawDetails(GuiGraphicsExtractor graphics, BackupCatalogClient.Entry selection) {
+        int x = detailX() + 12;
+        int limit = detailWidth() - 24;
+        int y = listY() + 9;
+        drawLeft(graphics, tr("section.details"), x, y, ACCENT);
+        y += 21;
+        if (selection == null) {
+            drawLeft(graphics, fit(tr("detail.none"), limit), x, y + 10, MUTED);
+            return;
+        }
+        y = detailField(graphics, x, y, limit, "field.date", selection.date(), pagerY());
+        y = detailField(graphics, x, y, limit, "field.size", size(selection.size()), pagerY());
+        y = detailField(graphics, x, y, limit, "field.operator", selection.operator(), pagerY());
+        y = detailField(graphics, x, y, limit, "field.dimensions",
+            String.join(", ", selection.dimensions()), pagerY());
+        y = detailField(graphics, x, y, limit, "field.comment", selection.comment(), pagerY());
+        if (y + 11 <= pagerY()) {
+            String status = selection.restorable() ? tr("state.ready") : selection.reason().isBlank()
+                ? tr("state.unavailable") : localized(selection.reason()).getString();
+            drawLeft(graphics, fit(tr("field.status") + "  " + status, limit), x, y,
+                selection.restorable() ? ACCENT : WARNING);
+        }
+        if (selection.safety() && y + 24 <= pagerY())
+            drawLeft(graphics, tr("state.temporary"), x, y + 14, WARNING);
+    }
+
+    private int detailField(GuiGraphicsExtractor graphics, int x, int y, int limit, String key,
+            String value, int bottom) {
+        if (y + 13 > bottom) return y;
+        String shown = value == null || value.isBlank() ? tr("detail.unknown") : value;
+        drawLeft(graphics, fit(tr(key) + "  " + shown, limit), x, y, 0xffdedede);
+        return y + 24;
+    }
+
+    private void drawCompactDetails(GuiGraphicsExtractor graphics, BackupCatalogClient.Entry selection) {
+        if (selection == null) return;
+        int y = pagerY() - 23;
+        String details = selection.restorable()
+            ? tr("field.size") + " " + size(selection.size()) + "  ·  " + selection.comment()
+            : localized(selection.reason()).getString();
+        box(graphics, contentX(), y - 3, contentWidth(), 18, SECTION, BORDER);
+        drawLeft(graphics, fit(details, contentWidth() - 12), contentX() + 6, y + 2,
+            selection.restorable() ? MUTED : WARNING);
+    }
+
+    private void box(GuiGraphicsExtractor graphics, int x, int y, int w, int h, int background, int border) {
+        graphics.fill(x, y, x + w, y + h, border);
+        graphics.fill(x + 1, y + 1, x + w - 1, y + h - 1, background);
+    }
+
+    private void drawLeft(GuiGraphicsExtractor graphics, String value, int x, int y, int color) {
+        graphics.centeredText(font, Component.literal(value), x + font.width(value) / 2, y, color);
+    }
+
+    private void centeredLines(GuiGraphicsExtractor graphics, Component message, int centerX,
+            int startY, int limit, int maxLines, int color) {
+        int row = 0;
+        for (var line : font.split(message, Math.max(35, limit))) {
+            if (row >= maxLines) break;
+            graphics.centeredText(font, line, centerX, startY + row * 11, color);
+            row++;
+        }
+    }
+
+    private String fit(String input, int maxWidth) {
+        String value = input == null ? "" : input;
+        int limit = Math.max(12, maxWidth);
+        if (font.width(value) <= limit) return value;
+        while (value.length() > 1 && font.width(value + "…") > limit)
+            value = value.substring(0, value.length() - 1);
+        return value + "…";
+    }
+
+    private static Component localized(String value) {
+        return value.startsWith("mcdr-singleplayer.") ? Component.translatable(value)
+            : Component.literal(value);
+    }
+
+    private static String tr(String suffix, Object... args) {
+        return Component.translatable("mcdr-singleplayer.backup.viewer." + suffix, args).getString();
     }
 
     private static String size(long bytes) {
         if (bytes <= 0) return "0 B";
         if (bytes < 1024) return bytes + " B";
-        if (bytes < 1024 * 1024) return (bytes / 1024) + " KiB";
-        return String.format("%.1f MiB", bytes / (1024.0 * 1024.0));
+        if (bytes < 1024L * 1024) return bytes / 1024 + " KiB";
+        if (bytes < 1024L * 1024 * 1024) return String.format("%.1f MiB", bytes / (1024.0 * 1024));
+        return String.format("%.1f GiB", bytes / (1024.0 * 1024 * 1024));
     }
 
     @Override public void onClose() {
