@@ -212,12 +212,69 @@ def main(argv=None):
     parser.add_argument('--world', required=True)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--list', action='store_true')
+    group.add_argument('--catalog', action='store_true')
     group.add_argument('--restore', type=int)
+    group.add_argument('--chunk-restore')
+    group.add_argument('--vanilla-restore')
+    group.add_argument('--vanilla-create', action='store_true')
+    group.add_argument('--make', choices=('prime', 'chunk'), dest='make')
+    parser.add_argument('--comment', default='')
+    parser.add_argument('--dimension')
+    parser.add_argument('--region')
+    group.add_argument('--setup', choices=('prime', 'chunk'))
+    group.add_argument('--paths', choices=('prime', 'chunk', 'vanilla'), dest='paths')
     args = parser.parse_args(argv)
     try:
         if args.list:
             _, _, _, _, _, database = locations(args.common, args.world)
             print(json.dumps({'backups': backup_rows(database, args.world)}, ensure_ascii=False))
+        elif args.catalog:
+            from .backup_catalog import catalog
+            print(json.dumps(catalog(args.common, args.world), ensure_ascii=False))
+        elif args.vanilla_create:
+            from .vanilla_restore import create
+            print(json.dumps({'completed': True, 'result': create(args.common, args.world)},
+                             ensure_ascii=False))
+        elif args.vanilla_restore:
+            from .vanilla_restore import restore as vanilla_restore
+            result = vanilla_restore(args.common, args.world, args.vanilla_restore)
+            print(json.dumps({'completed': True, 'result': result}, ensure_ascii=False))
+        elif args.make:
+            from . import backup_create
+            if args.make == 'prime':
+                result = backup_create.prime(args.common, args.world, getattr(args, 'comment', '') or '')
+            else:
+                bounds = None
+                if getattr(args, 'region', None):
+                    bounds = tuple(int(part) for part in args.region.split(','))
+                    if len(bounds) != 4:
+                        raise ValueError('mcdr-singleplayer.error.invalid_region_selection')
+                result = backup_create.chunk(args.common, args.world,
+                    getattr(args, 'comment', '') or '', getattr(args, 'dimension', None), bounds)
+            print(json.dumps({'completed': True, 'result': result}, ensure_ascii=False))
+        elif args.setup:
+            from . import backup_setup
+            result = (backup_setup.prime if args.setup == 'prime' else backup_setup.chunk)(
+                args.common, args.world)
+            print(json.dumps({'completed': True, 'result': result}, ensure_ascii=False))
+        elif args.paths:
+            from .backup_catalog import _relative, _store, paths, vanilla_dir
+            profile, _ = paths(args.common, args.world)
+            if args.paths == 'vanilla':
+                folder = vanilla_dir(args.common, args.world)
+                folder.mkdir(parents=True, exist_ok=True)
+            else:
+                config, _ = _store(profile, 'prime_backup' if args.paths == 'prime' else 'chunk_backup')
+                relative = _relative(profile, config.get('storage_root',
+                    './pb_files' if args.paths == 'prime' else './cb_files'))
+                if relative is None:
+                    raise RuntimeError('mcdr-singleplayer.catalog.' + args.paths + '_outside_profile')
+                folder = profile / relative
+            print(json.dumps({'path': str(Path(folder).resolve())}, ensure_ascii=False))
+        elif args.chunk_restore:
+            from .chunk_restore import restore as chunk_restore
+            result = chunk_restore(args.common, args.world, args.chunk_restore)
+            print(json.dumps({'completed': True, 'result': result}, ensure_ascii=False))
         else:
             history = restore(args.common, args.world, args.restore)
             print(json.dumps({'completed': True, 'history': str(history)}, ensure_ascii=False))

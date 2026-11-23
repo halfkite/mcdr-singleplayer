@@ -138,6 +138,10 @@ def adapt_java(text, name, row, loader):
         if name == 'RestoreBackupSelectionScreen.java':
             text = text.replace('GuiGraphicsExtractor', 'GuiGraphics').replace('extractRenderState', 'render')
             text = text.replace('graphics.centeredText', 'graphics.drawCenteredString')
+        if name == 'BackupViewerScreen.java':
+            # The viewer draws through the same two render APIs as the other bridge screens.
+            text = text.replace('GuiGraphicsExtractor', 'GuiGraphics').replace('extractRenderState', 'render')
+            text = text.replace('graphics.centeredText', 'graphics.drawCenteredString')
         if name == 'PythonSetupScreen.java':
             # Older Screen APIs do not expose clickUrlAction; keep vanilla link confirmation.
             text = text.replace('clickUrlAction(Minecraft.getInstance(), Minecraft.getInstance().screen, URI.create(url))',
@@ -189,7 +193,7 @@ def adapt_java(text, name, row, loader):
         text = adapt(text, name, row)
     package = BASE + '.v' + game.replace('.', '_')
     text = text.replace(BASE, package)
-    if name in ('RestoreWorldOpenMixin.java', 'RestoreTitleScreenMixin.java'):
+    if name in ('RestoreWorldOpenMixin.java', 'RestoreTitleScreenMixin.java', 'BackupViewerMixin.java'):
         text = text.replace('package ' + package + '.mixin;', 'package ' + BASE + '.mixin.v' + game.replace('.', '_') + ';')
     return text
 
@@ -206,7 +210,7 @@ def generate(loader, row):
     for source in (ROOT / 'fabric-bridge/src/main/java').rglob('*.java'):
         relative = source.relative_to(ROOT / 'fabric-bridge/src/main/java')
         relative = Path(str(relative).replace('mcdrsingleplayer', 'mcdrsingleplayer/v' + game.replace('.', '_')))
-        if source.name in ('RestoreWorldOpenMixin.java', 'RestoreTitleScreenMixin.java'):
+        if source.name in ('RestoreWorldOpenMixin.java', 'RestoreTitleScreenMixin.java', 'BackupViewerMixin.java'):
             relative = Path('io/github/mcdrsingleplayer/mixin/v' + game.replace('.', '_')) / source.name
         write(source_root / relative, adapt_java(source.read_text(encoding='utf8'), source.name, row, loader))
     for source in (ROOT / 'compat/bootstrap').glob('*.java'):

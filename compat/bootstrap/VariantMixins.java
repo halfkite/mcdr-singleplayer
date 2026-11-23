@@ -17,7 +17,8 @@ public final class VariantMixins implements IMixinConfigPlugin {
     @Override public void acceptTargets(Set<String> mine, Set<String> others) {}
     @Override public List<String> getMixins() {
         String relative = VersionSelector.implementation().substring("io.github.mcdrsingleplayer.".length());
-        return List.of(relative + ".RestoreWorldOpenMixin", relative + ".RestoreTitleScreenMixin");
+        return List.of(relative + ".RestoreWorldOpenMixin", relative + ".RestoreTitleScreenMixin",
+                relative + ".BackupViewerMixin");
     }
     @Override public void preApply(String target, ClassNode node, String mixin, IMixinInfo info) {}
     @Override public void postApply(String target, ClassNode node, String mixin, IMixinInfo info) {}

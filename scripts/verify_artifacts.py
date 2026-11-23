@@ -43,7 +43,8 @@ def verify(loader, family, release_assets=None, timestamp=None):
             prefix = variants[row['minecraft']].replace('.', '/')
             variant = 'v' + row['minecraft'].replace('.', '_')
             for name in (prefix + '/SingleplayerBridge.class', 'io/github/mcdrsingleplayer/mixin/' + variant + '/RestoreWorldOpenMixin.class',
-                         'io/github/mcdrsingleplayer/mixin/' + variant + '/RestoreTitleScreenMixin.class'):
+                         'io/github/mcdrsingleplayer/mixin/' + variant + '/RestoreTitleScreenMixin.class',
+                         'io/github/mcdrsingleplayer/mixin/' + variant + '/BackupViewerMixin.class'):
                 binary = jar.read(name)
                 assert binary[:4] == b'\xca\xfe\xba\xbe'
                 assert struct.unpack('>H', binary[6:8])[0] == row['java'] + 44
