@@ -70,6 +70,7 @@ final class PythonSetupScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        // UI_POLISH_2026
         int panelWidth = Math.min(400, width - 24);
         int panelLeft = (width - panelWidth) / 2;
         int textWidth = Math.min(360, width - 40);
@@ -81,29 +82,36 @@ final class PythonSetupScreen extends Screen {
                 + instructions.size() * 10 + 8 + 18 + buttonCount * 24;
         int top = Math.max(20, (height - contentHeight) / 2);
         int panelBottom = Math.min(height - 12, top + contentHeight);
-        graphics.fill(0, 0, width, height, 0x90000000);
-        graphics.fill(panelLeft, top - 8, panelLeft + panelWidth, panelBottom + 8, 0xd0101010);
-        graphics.fill(panelLeft, top - 8, panelLeft + panelWidth, top - 7, 0xff555555);
-        graphics.centeredText(font, Component.translatable("mcdr-singleplayer.mod_name"), width / 2, top - 2, 0xffaaaaaa);
-        int y = top + 20;
-        graphics.centeredText(font, title, width / 2, y, 0xffffffff);
-        y += 26;
+
+        VanillaConfluxUi.backdrop(graphics, width, height, 0x90000000);
+        VanillaConfluxUi.panel(graphics, panelLeft, top - 8, panelWidth, panelBottom - top + 16);
+        VanillaConfluxUi.accent(graphics, panelLeft, top - 8, panelWidth);
+        VanillaConfluxUi.center(graphics, font,
+                Component.translatable("mcdr-singleplayer.mod_name"), width / 2, top - 2, 0xffaaaaaa);
+        VanillaConfluxUi.center(graphics, font, title, width / 2, top + 20, 0xffffffff);
+        VanillaConfluxUi.divider(graphics, panelLeft + 14, top + 34, panelWidth - 28);
+
+        int y = top + 46;
         for (var line : intro) {
-            graphics.centeredText(font, line, width / 2, y, 0xffdddddd);
+            VanillaConfluxUi.center(graphics, font, line, width / 2, y, 0xffdddddd);
             y += 10;
         }
         y += 8;
+        VanillaConfluxUi.divider(graphics, panelLeft + 20, y - 5, panelWidth - 40);
         for (var line : version) {
-            graphics.centeredText(font, line, width / 2, y, 0xffffd866);
+            VanillaConfluxUi.center(graphics, font, line, width / 2, y, 0xffffd866);
             y += 10;
         }
         y += 8;
+        VanillaConfluxUi.divider(graphics, panelLeft + 20, y - 5, panelWidth - 40);
         for (var line : instructions) {
-            graphics.centeredText(font, line, width / 2, y, 0xffaaaaaa);
+            VanillaConfluxUi.center(graphics, font, line, width / 2, y, 0xffaaaaaa);
             y += 10;
         }
         y += 8;
-        graphics.centeredText(font, Component.translatable("mcdr-singleplayer.python.escape_hint"), width / 2, y, 0xff888888);
+        VanillaConfluxUi.center(graphics, font,
+                Component.translatable("mcdr-singleplayer.python.escape_hint"),
+                width / 2, y, 0xff888888);
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
     }
 

@@ -118,11 +118,23 @@ public final class ChunkBackupScreen extends Screen {
     }
 
     @Override public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float ticks) {
-        graphics.fill(0, 0, width, height, 0xc0000000);
+        // UI_POLISH_2026
         int top = height / 2 - 80;
-        graphics.centeredText(font, title, width / 2, top, 0xffffffff);
-        graphics.centeredText(font, Component.translatable("mcdr-singleplayer.backup.viewer.chunk_help"),
-            width / 2, top + 130, 0xffa0a0a0);
+        int panelX = width / 2 - WIDTH / 2 - 12;
+        int panelY = top - 16;
+        int panelWidth = WIDTH + 24;
+        VanillaConfluxUi.backdrop(graphics, width, height, 0xc0000000);
+        VanillaConfluxUi.panel(graphics, panelX, panelY, panelWidth, 172);
+        VanillaConfluxUi.accent(graphics, panelX, panelY, panelWidth);
+        VanillaConfluxUi.center(graphics, font, title, width / 2, top, 0xffffffff);
+        VanillaConfluxUi.divider(graphics, panelX + 12, top + 12, panelWidth - 24);
+        VanillaConfluxUi.divider(graphics, panelX + 18, top + 124, panelWidth - 36);
+        var help = font.split(Component.translatable("mcdr-singleplayer.backup.viewer.chunk_help"), panelWidth - 28);
+        int y = top + 130;
+        for (var line : help) {
+            VanillaConfluxUi.center(graphics, font, line, width / 2, y, 0xffa0a0a0);
+            y += 10;
+        }
         super.extractRenderState(graphics, mouseX, mouseY, ticks);
     }
 

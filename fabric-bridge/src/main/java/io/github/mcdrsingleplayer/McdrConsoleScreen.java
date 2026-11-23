@@ -35,18 +35,25 @@ final class McdrConsoleScreen extends Screen {
 
     @Override
     protected void init() {
-        int inputWidth = Math.min(320, width - 40);
-        int left = (width - inputWidth) / 2;
+        // UI_POLISH_2026
+        int inputWidth = panelWidth() - 24;
+        int left = panelX() + 12;
         int half = inputWidth / 2 - 2;
-        input = new EditBox(font, left, height - 52, inputWidth, 20,
+        input = new EditBox(font, left, height - 58, inputWidth, 20,
                 Component.translatable("mcdr-singleplayer.console.input"));
         input.setMaxLength(256);
         addRenderableWidget(input);
         addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.console.send"),
-                button -> submit()).bounds(left, height - 26, half, 20).build());
+                button -> submit()).bounds(left, height - 34, half, 20).build());
         addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.setup.close"),
-                button -> onClose()).bounds(left + half + 4, height - 26, half, 20).build());
+                button -> onClose()).bounds(left + half + 4, height - 34, half, 20).build());
     }
+
+    // UI_POLISH_2026
+    private int panelWidth() { return Math.min(760, Math.max(240, width - 20)); }
+    private int panelX() { return (width - panelWidth()) / 2; }
+    private int logTop() { return 42; }
+    private int logBottom() { return Math.max(logTop() + LINE_HEIGHT + 8, height - 84); }
 
     private void submit() {
         String command = input == null ? "" : input.getValue().trim();
@@ -57,27 +64,67 @@ final class McdrConsoleScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        // UI_POLISH_2026
         refresh();
-        graphics.fill(0, 0, width, height, 0xf0101010);
-        graphics.centeredText(font, title, width / 2, 12, 0xffffffff);
+        int panelX = panelX();
+        int panelWidth = panelWidth();
+        VanillaConfluxUi.backdrop(graphics, width, height, 0xb0000000);
+        VanillaConfluxUi.panel(graphics, panelX, 12, panelWidth, height - 24);
+        VanillaConfluxUi.accent(graphics, panelX, 12, panelWidth);
+        VanillaConfluxUi.center(graphics, font, title, width / 2, 20, 0xffffffff);
+        VanillaConfluxUi.divider(graphics, panelX + 12, 36, panelWidth - 24);
 
-        int top = 30;
-        int bottom = height - 62;
-        int capacity = Math.max(1, (bottom - top) / LINE_HEIGHT);
+        int logX = panelX + 12;
+        int logWidth = panelWidth - 24;
+        int logTop = logTop();
+        int logBottom = logBottom();
+        VanillaConfluxUi.panel(graphics, logX, logTop, logWidth, logBottom - logTop);
+        int capacity = Math.max(1, (logBottom - logTop - 14) / LINE_HEIGHT);
         List<String> shown = window(capacity);
         if (shown.isEmpty()) {
-            graphics.centeredText(font, Component.translatable("mcdr-singleplayer.console.empty"),
-                    width / 2, top, 0xff888888);
+            VanillaConfluxUi.center(graphics, font,
+                    Component.translatable("mcdr-singleplayer.console.empty"),
+                    width / 2, (logTop + logBottom) / 2, 0xff888888);
+        } else {
+            int startY = Math.max(logTop + 6, logBottom - 8 - shown.size() * LINE_HEIGHT);
+            for (int index = 0; index < shown.size(); index++) {
+                String line = fit(shown.get(index), logWidth - 16);
+                VanillaConfluxUi.left(graphics, font, line, logX + 8,
+                        startY + index * LINE_HEIGHT, lineColor(line));
+            }
         }
-        for (int index = 0; index < shown.size(); index++) {
-            // centeredText with a shifted centre keeps one text call across every supported version.
-            String text = fit(shown.get(index));
-            graphics.centeredText(font, Component.literal(text), 12 + font.width(text) / 2,
-                    top + index * LINE_HEIGHT, 0xffcccccc);
-        }
-        graphics.centeredText(font, Component.translatable("mcdr-singleplayer.console.hint"),
-                width / 2, height - 66, 0xff888888);
+
+        VanillaConfluxUi.center(graphics, font,
+                Component.translatable("mcdr-singleplayer.console.hint"),
+                width / 2, height - 76, 0xff888888);
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+    }
+
+    /**
+     * 按像素宽度截断一行，超出部分用省略号。
+     *
+     * 原来逐字符回退，每帧每行都要重算多次 font.width；日志行很长时是 O(n²)。
+     * 这里改成二分找最长可容纳的前缀，仍是 O(log n) 次测量。
+     */
+    private String fit(String text, int maxWidth) {
+        String value = text == null ? "" : text;
+        if (font.width(value) <= maxWidth) return value;
+        int low = 0;
+        int high = value.length();
+        while (low < high) {
+            int middle = (low + high + 1) / 2;
+            if (font.width(value.substring(0, middle) + "…") <= maxWidth) low = middle;
+            else high = middle - 1;
+        }
+        return value.substring(0, low) + "…";
+    }
+
+    private static int lineColor(String text) {
+        String upper = text.toUpperCase(java.util.Locale.ROOT);
+        if (upper.contains("ERROR") || upper.contains("FAILED")) return 0xffff7777;
+        if (upper.contains("WARN")) return 0xffffd866;
+        if (upper.contains("DEBUG")) return 0xff888888;
+        return 0xffcccccc;
     }
 
     /** Newest {@code capacity} lines; the console follows the tail. */

@@ -40,64 +40,100 @@ final class McdrSetupScreen extends Screen {
 
     @Override
     protected void init() {
-        int buttonWidth = Math.min(200, width - 40);
-        int center = (width - buttonWidth) / 2;
+        // UI_POLISH_2026
+        int buttonWidth = Math.min(200, panelWidth() - 24);
+        int center = width / 2;
         View view = behaviour.view();
         Status status = view.status();
         boolean stalled = view.stalledSeconds() > 0;
         boolean needsPython = status == Status.NEEDS_PYTHON && !stalled;
         boolean downloadable = (status == Status.NEEDS_INSTALL || status == Status.FAILED) && !stalled;
+        int primaryY = primaryY();
+
         if (stalled) {
             addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.setup.terminate"),
-                    button -> behaviour.terminate()).bounds(center, height - 56, buttonWidth, 20).build());
+                    button -> behaviour.terminate()).bounds(center - buttonWidth / 2, primaryY, buttonWidth, 20).build());
         }
         if (needsPython) {
             addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.setup.python_download"),
-                    button -> behaviour.openPython()).bounds(center, height - 56, buttonWidth, 20).build());
+                    button -> behaviour.openPython()).bounds(center - buttonWidth / 2, primaryY, buttonWidth, 20).build());
         }
         if (downloadable) {
             addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.setup.download"),
-                    button -> behaviour.install()).bounds(center, height - 56, buttonWidth, 20).build());
+                    button -> behaviour.install()).bounds(center - buttonWidth / 2, primaryY, buttonWidth, 20).build());
         }
-        boolean hasPrimary = needsPython || downloadable || stalled;
-        int rowY = hasPrimary ? height - 32 : height - 48;
-        int half = buttonWidth / 2 - 2;
+
+        int half = (buttonWidth - 4) / 2;
+        int left = center - buttonWidth / 2;
+        int rowY = secondaryY();
         addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.console.button"),
-                button -> behaviour.openConsole()).bounds(center, rowY, half, 20).build());
-        addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.setup.close"), button -> onClose())
-                .bounds(center + half + 4, rowY, half, 20).build());
+                button -> behaviour.openConsole()).bounds(left, rowY, half, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.setup.close"),
+                button -> onClose()).bounds(left + half + 4, rowY, half, 20).build());
     }
+
+    // UI_POLISH_2026
+    private int panelWidth() { return Math.min(440, Math.max(180, width - 20)); }
+    private int panelHeight() { return Math.min(224, Math.max(160, height - 16)); }
+    private int panelX() { return (width - panelWidth()) / 2; }
+    private int panelY() { return (height - panelHeight()) / 2; }
+    private int primaryY() { return panelY() + panelHeight() - 56; }
+    private int secondaryY() { return panelY() + panelHeight() - 30; }
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fill(0, 0, width, height, 0x90000000);
+        // UI_POLISH_2026
+        int panelX = panelX();
+        int panelY = panelY();
+        int panelWidth = panelWidth();
+        int panelHeight = panelHeight();
+        VanillaConfluxUi.backdrop(graphics, width, height, 0x90000000);
+        VanillaConfluxUi.panel(graphics, panelX, panelY, panelWidth, panelHeight);
+        VanillaConfluxUi.accent(graphics, panelX, panelY, panelWidth);
+
         View view = behaviour.view();
-        int textWidth = Math.min(360, width - 40);
-        int contentHeight = 76 + (view.status() == Status.INSTALLING ? 16 : 0);
-        int top = Math.max(12, (height - 44 - contentHeight) / 2);
-        graphics.centeredText(font, Component.translatable("mcdr-singleplayer.mod_name"), width / 2, top, 0xffaaaaaa);
-        graphics.centeredText(font, title, width / 2, top + 20, 0xffffffff);
-        int y = top + 44;
+        VanillaConfluxUi.center(graphics, font, Component.translatable("mcdr-singleplayer.mod_name"),
+                width / 2, panelY + 12, 0xffaaaaaa);
+        VanillaConfluxUi.center(graphics, font, title, width / 2, panelY + 28, 0xffffffff);
+        VanillaConfluxUi.divider(graphics, panelX + 12, panelY + 42, panelWidth - 24);
+
+        int textWidth = panelWidth - 36;
+        int y = panelY + 54;
+        int contentBottom = primaryY() - 12;
+        int statusColor = view.status() == Status.FAILED ? 0xffff7777
+                : view.status() == Status.INSTALLING ? 0xffffd866
+                : view.status() == Status.READY ? 0xffc6e3c6 : 0xffdddddd;
         for (var line : font.split(message(view), textWidth)) {
-            graphics.centeredText(font, line, width / 2, y, 0xffdddddd);
+            if (y + 10 > contentBottom) break;
+            VanillaConfluxUi.center(graphics, font, line, width / 2, y, statusColor);
             y += 10;
         }
+
         if (view.status() == Status.FAILED || view.status() == Status.INSTALLING) {
             InstallProgress progress = view.progress();
-            Component stage = Component.translatable(progress.translationKey());
-            if (progress.attempt() > 0) stage = stage.copy().append(Component.translatable("mcdr-singleplayer.install.attempt", progress.attempt()));
-            for (var line : font.split(stage, textWidth)) {
-                graphics.centeredText(font, line, width / 2, y, view.status() == Status.FAILED ? 0xffff5555 : 0xffffd866);
-                y += 10;
+            if (progress != null) {
+                Component stage = Component.translatable(progress.translationKey());
+                if (progress.attempt() > 0) {
+                    stage = stage.copy().append(Component.translatable("mcdr-singleplayer.install.attempt", progress.attempt()));
+                }
+                for (var line : font.split(stage, textWidth)) {
+                    if (y + 10 > contentBottom) break;
+                    VanillaConfluxUi.center(graphics, font, line, width / 2, y,
+                            view.status() == Status.FAILED ? 0xffff7777 : 0xffffd866);
+                    y += 10;
+                }
             }
         }
-        if (view.status() == Status.INSTALLING) {
-            graphics.centeredText(font, LoadingDotsText.get(System.currentTimeMillis()), width / 2, y + 6, 0xffaaaaaa);
-            y += 16;
+        if (view.status() == Status.INSTALLING && y + 10 <= contentBottom) {
+            VanillaConfluxUi.center(graphics, font,
+                    LoadingDotsText.get(System.currentTimeMillis()), width / 2, y + 2, 0xffaaaaaa);
+            y += 12;
         }
-        // The hint sits above the buttons but below the content, so neither can overlap it.
-        graphics.centeredText(font, Component.translatable("mcdr-singleplayer.setup.escape_hint"), width / 2,
-                Math.min(y + 10, height - 72), 0xff888888);
+
+        int hintY = Math.min(y + 6, primaryY() - 12);
+        VanillaConfluxUi.center(graphics, font,
+                Component.translatable("mcdr-singleplayer.setup.escape_hint"),
+                width / 2, hintY, 0xff888888);
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
     }
 

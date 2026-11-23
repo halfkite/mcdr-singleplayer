@@ -63,11 +63,20 @@ public final class BackupCommentScreen extends Screen {
     }
 
     @Override public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float ticks) {
-        graphics.fill(0, 0, width, height, 0xc0000000);
+        // UI_POLISH_2026
         int top = height / 2 - 40;
-        graphics.centeredText(font, title, width / 2, top, 0xffffffff);
+        int panelX = width / 2 - WIDTH / 2 - 12;
+        int panelY = top - 16;
+        VanillaConfluxUi.backdrop(graphics, width, height, 0xc0000000);
+        VanillaConfluxUi.panel(graphics, panelX, panelY, WIDTH + 24, 96);
+        VanillaConfluxUi.accent(graphics, panelX, panelY, WIDTH + 24);
+        VanillaConfluxUi.center(graphics, font, title, width / 2, top, 0xffffffff);
+        VanillaConfluxUi.divider(graphics, panelX + 12, top + 12, WIDTH);
         if (!hint.isEmpty()) {
-            graphics.centeredText(font, localized(hint), width / 2, top + 12, 0xffa0a0a0);
+            Component hintText = localized(hint);
+            String shown = font.plainSubstrByWidth(hintText.getString(), WIDTH - 12);
+            VanillaConfluxUi.center(graphics, font, Component.literal(shown),
+                    width / 2, top + 14, 0xffa0a0a0);
         }
         super.extractRenderState(graphics, mouseX, mouseY, ticks);
     }

@@ -31,10 +31,12 @@ final class RestoreBackupSelectionScreen extends Screen {
     }
 
     @Override protected void init() {
-        int x = width / 2 - 150;
-        int top = Math.max(14, height / 2 - 112);
+        // UI_POLISH_2026
+        int x = contentX();
+        int listWidth = contentWidth();
+        int top = panelY();
         addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.restore.retry.back"),
-            button -> onClose()).bounds(x, top + 200, 300, 20).build());
+            button -> onClose()).bounds(width / 2 - 100, backY(), 200, 20).build());
         if (backups == null) {
             if (!loading) {
                 loading = true;
@@ -48,18 +50,20 @@ final class RestoreBackupSelectionScreen extends Screen {
         }
         for (int index = page * PAGE_SIZE; index < Math.min(backups.size(), (page + 1) * PAGE_SIZE); index++) {
             var backup = backups.get(index);
-            addRenderableWidget(Button.builder(backup.id() == selected
+            int rowY = rowY() + (index - page * PAGE_SIZE) * 24;
+            var item = addRenderableWidget(Button.builder(backup.id() == selected
                     ? Component.empty().append(Component.literal("> ")).append(backup.label()) : backup.label(), button ->
                 Minecraft.getInstance().gui.setScreen(new RestoreBackupSelectionScreen(world, backups, "", page, backup.id())))
-                .bounds(x, top + 56 + (index % PAGE_SIZE) * 24, 300, 20).build());
+                .bounds(x, rowY, listWidth, 20).build());
+            item.active = true;
         }
         var previous = addRenderableWidget(Button.builder(Component.literal("<"), button ->
             Minecraft.getInstance().gui.setScreen(new RestoreBackupSelectionScreen(world, backups, "", page - 1, 0)))
-            .bounds(x, top + 174, 28, 20).build());
+            .bounds(x, pagerY(), 28, 20).build());
         previous.active = page > 0;
         var next = addRenderableWidget(Button.builder(Component.literal(">"), button ->
             Minecraft.getInstance().gui.setScreen(new RestoreBackupSelectionScreen(world, backups, "", page + 1, 0)))
-            .bounds(x + 272, top + 174, 28, 20).build());
+            .bounds(x + listWidth - 28, pagerY(), 28, 20).build());
         next.active = (page + 1) * PAGE_SIZE < backups.size();
         var confirm = addRenderableWidget(Button.builder(Component.translatable("mcdr-singleplayer.restore.retry.confirm", selected),
             button -> {
@@ -68,30 +72,65 @@ final class RestoreBackupSelectionScreen extends Screen {
                         Minecraft.getInstance().gui.setScreen(new RestoreBackupSelectionScreen(world, backups, reason, page, selected));
                 });
                 Minecraft.getInstance().gui.setScreen(new TitleScreen());
-            }).bounds(x + 36, top + 174, 228, 20).build());
+            }).bounds(x + 34, pagerY(), Math.max(80, listWidth - 68), 20).build());
         confirm.active = selected > 0;
     }
 
+    // UI_POLISH_2026
+    private int panelWidth() { return Math.min(560, Math.max(280, width - 20)); }
+    private int panelHeight() { return Math.min(236, Math.max(200, height - 16)); }
+    private int panelX() { return (width - panelWidth()) / 2; }
+    private int panelY() { return (height - panelHeight()) / 2; }
+    private int contentX() { return panelX() + 14; }
+    private int contentWidth() { return panelWidth() - 28; }
+    private int rowY() { return panelY() + 60; }
+    private int warningY() { return panelY() + panelHeight() - 66; }
+    private int pagerY() { return panelY() + panelHeight() - 52; }
+    private int backY() { return panelY() + panelHeight() - 28; }
+
     @Override public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float ticks) {
-        int top = Math.max(14, height / 2 - 112);
-        graphics.fill(0, 0, width, height, 0xb0000000);
-        graphics.centeredText(font, title, width / 2, top - 8, 0xffffffff);
-        graphics.centeredText(font, Component.literal(world), width / 2, top + 14, 0xffaaaaaa);
-        if (backups == null) graphics.centeredText(font,
-            Component.translatable("mcdr-singleplayer.restore.retry.loading"), width / 2, top + 90, 0xffaaaaaa);
-        else if (backups.isEmpty() && error.isEmpty()) graphics.centeredText(font,
-            Component.translatable("mcdr-singleplayer.restore.retry.empty"), width / 2, top + 90, 0xffaaaaaa);
+        // UI_POLISH_2026
+        int panelX = panelX();
+        int panelY = panelY();
+        int panelWidth = panelWidth();
+        int panelHeight = panelHeight();
+        int contentX = contentX();
+        int contentWidth = contentWidth();
+        VanillaConfluxUi.backdrop(graphics, width, height, 0xb0000000);
+        VanillaConfluxUi.panel(graphics, panelX, panelY, panelWidth, panelHeight);
+        VanillaConfluxUi.accent(graphics, panelX, panelY, panelWidth);
+        VanillaConfluxUi.center(graphics, font, title, width / 2, panelY + 12, 0xffffffff);
+        String worldLabel = font.plainSubstrByWidth(world, contentWidth);
+        VanillaConfluxUi.left(graphics, font, worldLabel, contentX, panelY + 30, 0xffaaaaaa);
+        VanillaConfluxUi.divider(graphics, contentX, panelY + 44, contentWidth);
+
         if (!error.isEmpty()) {
-            int y = top + 28;
-            for (var line : font.split(Component.literal(error), Math.min(300, width - 30))) {
-                if (y > top + 48) break;
-                graphics.centeredText(font, line, width / 2, y, 0xffff7777);
-                y += 10;
+            String shownError = font.plainSubstrByWidth(error, contentWidth);
+            VanillaConfluxUi.left(graphics, font, shownError, contentX, panelY + 49, 0xffff7777);
+        }
+        if (backups == null) {
+            VanillaConfluxUi.center(graphics, font,
+                    Component.translatable("mcdr-singleplayer.restore.retry.loading"),
+                    width / 2, panelY + 104, 0xffaaaaaa);
+        } else if (backups.isEmpty() && error.isEmpty()) {
+            VanillaConfluxUi.center(graphics, font,
+                    Component.translatable("mcdr-singleplayer.restore.retry.empty"),
+                    width / 2, panelY + 104, 0xffaaaaaa);
+        } else if (!backups.isEmpty()) {
+            VanillaConfluxUi.center(graphics, font,
+                    Component.translatable("mcdr-singleplayer.restore.retry.warning"),
+                    width / 2, warningY(), 0xffffcc66);
+        }
+        super.extractRenderState(graphics, mouseX, mouseY, ticks);
+
+        if (backups != null && selected > 0) {
+            for (int index = page * PAGE_SIZE; index < Math.min(backups.size(), (page + 1) * PAGE_SIZE); index++) {
+                if (backups.get(index).id() != selected) continue;
+                int y = rowY() + (index - page * PAGE_SIZE) * 24;
+                graphics.fill(contentX + 2, y + 3, contentX + 4, y + 17, 0xffd8d8d8);
+                break;
             }
         }
-        graphics.centeredText(font, Component.translatable("mcdr-singleplayer.restore.retry.warning"),
-            width / 2, top + 158, 0xffffcc66);
-        super.extractRenderState(graphics, mouseX, mouseY, ticks);
     }
 
     @Override public void onClose() { Minecraft.getInstance().gui.setScreen(new TitleScreen()); }

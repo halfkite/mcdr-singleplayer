@@ -21,3 +21,6 @@ docs/项目指令.md
 # 本地验证用的临时工作目录
 .bt/
 .run/
+
+# UI 补丁脚本生成的原始文件备份
+.mcdr-ui-polish-backup/

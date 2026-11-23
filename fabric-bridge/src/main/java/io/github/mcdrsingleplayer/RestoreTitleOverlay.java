@@ -53,44 +53,69 @@ final class RestoreTitleOverlay {
             ScreenEvents.afterExtract(screen).register((ignored, graphics, mouseX, mouseY, ticks) -> {
                 var value = monitor.visible();
                 if (value == null) return;
-                int textWidth = Math.min(310, width - 48);
-                // Match vanilla loading screens, including resource pack textures.
+                int panelWidth = Math.min(420, width - 24);
+                int panelX = (width - panelWidth) / 2;
+                int panelY = top - 14;
+                int textWidth = Math.min(310, panelWidth - 32);
+
+                // 继续使用原版标题界面的全景背景，只在进度信息下增加中性灰面板。
                 graphics.nextStratum();
                 background.extractBackground(graphics, mouseX, mouseY, ticks);
                 graphics.nextStratum();
+                VanillaConfluxUi.panel(graphics, panelX, panelY, panelWidth, 184);
+                VanillaConfluxUi.accent(graphics, panelX, panelY, panelWidth);
+
                 var font = screen.getFont();
-                var title = Component.translatable("mcdr-singleplayer.restore.title." + switch (value.status()) {
+                String statusKey = switch (value.status()) {
                     case "completed", "failed", "cancelled" -> value.status();
                     default -> "running";
-                });
-                graphics.centeredText(font, title, width / 2, top, 0xffffffff);
-                graphics.centeredText(font, font.plainSubstrByWidth(value.world() + (value.backup() > 0 ? "  (#" + value.backup() + ")" : ""), textWidth), width / 2, top + 20, 0xffa0a0a0);
+                };
+                var title = Component.translatable("mcdr-singleplayer.restore.title." + statusKey);
+                int titleColor = value.status().equals("failed") ? 0xffff7777
+                        : value.status().equals("completed") ? 0xffc6e3c6 : 0xffffffff;
+                VanillaConfluxUi.center(graphics, font, title, width / 2, top, titleColor);
+
+                String world = value.world() + (value.backup() > 0 ? "  (#" + value.backup() + ")" : "");
+                VanillaConfluxUi.center(graphics, font,
+                        Component.literal(font.plainSubstrByWidth(world, textWidth)),
+                        width / 2, top + 20, 0xffa0a0a0);
+                VanillaConfluxUi.divider(graphics, panelX + 18, top + 34, panelWidth - 36);
+
                 var stage = Component.translatable("mcdr-singleplayer.restore.stage." + switch (value.stage()) {
-                    case "checking", "saving", "waiting_files", "safety_backup", "restoring", "rolling_back", "player_data", "completed", "cancelled" -> value.stage();
+                    case "checking", "saving", "waiting_files", "safety_backup", "restoring", "rolling_back",
+                            "player_data", "completed", "cancelled" -> value.stage();
                     default -> "failed";
                 });
                 int stageY = top + 42;
                 for (var line : font.split(stage, textWidth)) {
                     if (stageY > top + 52) break;
-                    graphics.centeredText(font, line, width / 2, stageY, 0xffffffff);
+                    VanillaConfluxUi.center(graphics, font, line, width / 2, stageY, 0xffffffff);
                     stageY += 10;
                 }
                 if (value.running()) {
-                    graphics.centeredText(font, LoadingDotsText.get(Util.getMillis()), width / 2, top + 68, 0xff808080);
+                    VanillaConfluxUi.center(graphics, font,
+                            LoadingDotsText.get(Util.getMillis()), width / 2, top + 68, 0xffaaaaaa);
                 }
+
                 Component detail = value.detail().startsWith("mcdr-singleplayer.")
-                    ? Component.translatable(value.detail()) : Component.literal(value.detail());
-                if (value.detail().isEmpty()) detail = value.running()
-                    ? Component.translatable("mcdr-singleplayer.restore.detail.running")
-                    : value.status().equals("completed") ? Component.translatable("mcdr-singleplayer.restore.detail.completed")
-                    : value.modified() ? Component.translatable("mcdr-singleplayer.restore.detail.locked") : Component.empty();
+                        ? Component.translatable(value.detail()) : Component.literal(value.detail());
+                if (value.detail().isEmpty()) {
+                    detail = value.running()
+                            ? Component.translatable("mcdr-singleplayer.restore.detail.running")
+                            : value.status().equals("completed")
+                                    ? Component.translatable("mcdr-singleplayer.restore.detail.completed")
+                                    : value.modified()
+                                            ? Component.translatable("mcdr-singleplayer.restore.detail.locked")
+                                            : Component.empty();
+                }
                 int lineY = top + 90;
                 for (var line : font.split(detail, textWidth)) {
                     if (lineY > top + 100) break;
-                    graphics.centeredText(font, line, width / 2, lineY, 0xffa0a0a0);
+                    VanillaConfluxUi.center(graphics, font, line, width / 2, lineY, 0xffa0a0a0);
                     lineY += 10;
                 }
-                dismiss.setMessage(Component.translatable(value.running() ? "mcdr-singleplayer.restore.button.running" : "mcdr-singleplayer.restore.button.menu"));
+                dismiss.setMessage(Component.translatable(value.running()
+                        ? "mcdr-singleplayer.restore.button.running" : "mcdr-singleplayer.restore.button.menu"));
                 graphics.nextStratum();
                 if (retry.visible) retry.extractRenderState(graphics, mouseX, mouseY, ticks);
                 dismiss.extractRenderState(graphics, mouseX, mouseY, ticks);

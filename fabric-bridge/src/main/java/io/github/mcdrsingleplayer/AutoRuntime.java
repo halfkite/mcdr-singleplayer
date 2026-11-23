@@ -196,9 +196,14 @@ final class AutoRuntime {
             Files.createDirectories(launcher.getParent());
             Files.writeString(launcher, "@echo off\r\nchcp 65001 > nul\r\n" + command + "\r\n",
                     java.nio.charset.StandardCharsets.UTF_8);
-            // start gives the window its own console; /k keeps it open after the front-end exits.
-            new ProcessBuilder("cmd.exe", "/c", "start", "MCDR console", "cmd.exe", "/k",
-                    quote(launcher.toString())).start();
+            // start 让控制台窗口独立存在；/k 让前端口退出后窗口仍然留着。
+            //
+            // 这里必须把整条命令拼成一个字符串交给 cmd.exe，不能拆成参数数组：
+            // ProcessBuilder 会把 /k "路径" 当成两个参数交给外层 cmd，而 start 还要
+            // 再解析一次引号，两层解析叠加会把含空格的路径拆断（实例路径里就有空格），
+            // 结果新窗口刚出现就退出。start 的第一个引号参数是窗口标题，不能省。
+            new ProcessBuilder("cmd.exe", "/c",
+                    "start \"MCDR console\" cmd.exe /k \"" + launcher + "\"").start();
             return true;
         } catch (IOException e) {
             LOGGER.warn("Could not open the MCDR console window", e);
