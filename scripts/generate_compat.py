@@ -132,7 +132,10 @@ def adapt_java(text, name, row, loader):
                     text = text.replace('extractDefaultSprite(graphics);',
                                         'super.renderWidget(graphics, mouseX, mouseY, partialTick);')
         if name in ('RestoreTitleScreenMixin.java', 'PythonSetupScreen.java', 'McdrSetupScreen.java',
-                    'McdrConsoleScreen.java'):
+                    'McdrConsoleScreen.java', 'BackupCommentScreen.java', 'ChunkBackupScreen.java',
+                    'VanillaConfluxUi.java'):
+            # 这些界面共用同一套绘制入口；26.1 起才把它们拆成 render state 形式，
+            # 之前的版本是 GuiGraphics + render，居中文字也叫 drawCenteredString。
             text = text.replace('GuiGraphicsExtractor', 'GuiGraphics').replace('extractRenderState', 'render')
             text = text.replace('graphics.centeredText', 'graphics.drawCenteredString')
         if name == 'RestoreBackupSelectionScreen.java':
@@ -142,6 +145,16 @@ def adapt_java(text, name, row, loader):
             # The viewer draws through the same two render APIs as the other bridge screens.
             text = text.replace('GuiGraphicsExtractor', 'GuiGraphics').replace('extractRenderState', 'render')
             text = text.replace('graphics.centeredText', 'graphics.drawCenteredString')
+            if parts < (1, 21, 9):
+                # 按键回调的分界是 1.21.9（实测：1.21.8 仍是三参数，1.21.9 起改成了
+                # KeyEvent 事件对象）；这和渲染 API 的 26.1 分界不是一回事，两者要分开判。
+                text = text.replace('import net.minecraft.client.input.KeyEvent;\n', '')
+                text = text.replace(
+                    '@Override public boolean keyPressed(KeyEvent event) {',
+                    '@Override public boolean keyPressed(int keyCode, int scanCode, int modifiers) {')
+                text = text.replace('switch (event.key()) {', 'switch (keyCode) {')
+                text = text.replace('return super.keyPressed(event);',
+                                    'return super.keyPressed(keyCode, scanCode, modifiers);')
         if name == 'PythonSetupScreen.java':
             # Older Screen APIs do not expose clickUrlAction; keep vanilla link confirmation.
             text = text.replace('clickUrlAction(Minecraft.getInstance(), Minecraft.getInstance().screen, URI.create(url))',

@@ -25,10 +25,30 @@ def check_unlocked(world):
         raise RuntimeError(tr('error.world_session_lock_is_still_held_save_and_quit_before_restoring')) from exc
 
 
+# Windows 把下面这些名字当设备，任何目录下都指向设备而不是普通文件；写成 ``NUL``
+# 之类的相对路径会绕过目录边界检查（写入被静默丢弃或写到别处）。备份文件名由存档
+# 名和备份库决定，正常永远不会用到它们，直接拒绝。
+WINDOWS_DEVICE_NAMES = frozenset({
+    'con', 'prn', 'aux', 'nul', 'conin$', 'conout$',
+    *(f'com{number}' for number in range(1, 10)),
+    *(f'lpt{number}' for number in range(1, 10)),
+})
+
+
 def checked_path(root, relative):
-    root = Path(root).absolute()
+    """Resolve one path strictly inside ``root``.
+
+    ``root`` 现在统一走 ``resolve()``：只调用 ``absolute()`` 时，传进来的 root 若自带
+    ``..``（例如 ``<base>/real/../outside``），拼出的 target 与 root 都含 ``..``，
+    两侧比较会一起通过，实际路径却已经越出 ``real/``。``resolve()`` 会先消除这些
+    相对段，比较才有意义。root 不存在时 resolve 不会抛错（strict 默认关闭），
+    调用方传尚待创建的目录也安全。
+    """
+    root = Path(root).resolve()
     relative = Path(relative)
     if relative.is_absolute() or not relative.parts or '..' in relative.parts:
+        raise RuntimeError(tr('error.backup_path_is_outside_its_bound_directory'))
+    if any(_is_windows_hazard(part) for part in relative.parts):
         raise RuntimeError(tr('error.backup_path_is_outside_its_bound_directory'))
     target = root / relative
     for candidate in (root, *reversed(target.parents), target):
@@ -36,9 +56,23 @@ def checked_path(root, relative):
             info = candidate.lstat()
             if stat.S_ISLNK(info.st_mode) or getattr(info, 'st_file_attributes', 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT:
                 raise RuntimeError(tr('error.backup_paths_cannot_contain_symbolic_links_or_junctions'))
-    if not target.resolve().is_relative_to(root.resolve()):
+    if not target.resolve().is_relative_to(root):
         raise RuntimeError(tr('error.backup_path_is_outside_its_bound_directory'))
     return target
+
+
+def _is_windows_hazard(part):
+    """Windows-only names that never denote a file inside the directory.
+
+    备用数据流用 ``名称:流`` 的形式给同一文件挂额外数据；磁盘不允许在文件名里用
+    ``:``，所以出现它就一定不是普通备份文件。
+    """
+    if os.name != 'nt':
+        return False
+    if ':' in part:
+        return True
+    # 设备名比较不区分大小写，且带扩展名的 ``NUL.txt`` 同样是设备。
+    return part.split('.')[0].lower() in WINDOWS_DEVICE_NAMES
 
 
 def check_tree(path):

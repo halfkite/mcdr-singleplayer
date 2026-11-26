@@ -6,6 +6,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 
 /**
@@ -182,6 +183,84 @@ public final class BackupViewerScreen extends Screen {
 
     private Component tab(String kind) {
         return Component.translatable("mcdr-singleplayer.backup.viewer.tab." + kind, count(kind));
+    }
+
+    /**
+     * 滚轮翻页：在列表区域滚动时走上一页/下一页。
+     *
+     * 只认列表所在的那一块，避免在标签页或按钮上滚动时页面自己跳走。界面靠翻页
+     * 而不是连续滚动，所以一次滚轮手势只移动一页，和点 `<` `>` 等价。
+     */
+    @Override public boolean mouseScrolled(double mouseX, double mouseY, double horizontal, double vertical) {
+        if (!listRegionContains(mouseX, mouseY) || working) return super.mouseScrolled(mouseX, mouseY, horizontal, vertical);
+        if (vertical > 0) movePage(-1);
+        else if (vertical < 0) movePage(1);
+        return true;
+    }
+
+    /** 滚轮是否落在列表区域内（列表列 + 分页行之间）。 */
+    private boolean listRegionContains(double x, double y) {
+        if (catalog == null) return false;
+        int left = contentX();
+        int right = left + listWidth();
+        int top = listY() - 4;
+        int bottom = pagerY() + 20;
+        return x >= left && x <= right && y >= top && y <= bottom;
+    }
+
+    /** 翻页；越界时什么也不做，不把页码推成负数或超出末页。 */
+    private void movePage(int delta) {
+        int target = safePage() + delta;
+        if (target < 0) return;
+        if (target * rows() >= entries().size()) return;
+        Minecraft.getInstance().gui.setScreen(with(tab, target, selected, false));
+    }
+
+    /**
+     * 键盘选择：上下键在列表里移动选中项，左右键翻页，回车回档。
+     *
+     * 选中项存在 {@link #selected} 里，移动后整页重建（和点击行一致），这样详情面板
+     * 与确认按钮的可用状态都跟着刷新。Tab/Enter 仍然交给原版按钮导航，不受影响。
+     *
+     * 26.3 起原版把按键改成了 KeyEvent 事件对象，不再传 (keyCode, scanCode, modifiers)，
+     * 所以这里从事件里取键码。
+     */
+    @Override public boolean keyPressed(KeyEvent event) {
+        if (!working) {
+            switch (event.key()) {
+                case 265 -> { moveSelection(-1); return true; }   // GLFW_KEY_UP
+                case 264 -> { moveSelection(1); return true; }    // GLFW_KEY_DOWN
+                case 263 -> { movePage(-1); return true; }        // GLFW_KEY_LEFT
+                case 262 -> { movePage(1); return true; }         // GLFW_KEY_RIGHT
+                case 257 -> {                                      // GLFW_KEY_ENTER
+                    if (chosen() != null) { restore(); return true; }
+                }
+                default -> { }
+            }
+        }
+        return super.keyPressed(event);
+    }
+
+    /**
+     * 移动选中项；跨页时自动翻到相邻页。
+     *
+     * 没有选中项时，向下选第一条、向上选最后一条，避免按键完全没反应。
+     */
+    private void moveSelection(int delta) {
+        if (catalog == null) return;
+        var items = entries();
+        if (items.isEmpty()) return;
+        int index = -1;
+        for (int position = 0; position < items.size(); position++) {
+            if (items.get(position).ref().equals(selected)) { index = position; break; }
+        }
+        if (index < 0) index = delta > 0 ? -1 : items.size();
+        index += delta;
+        if (index < 0) index = 0;
+        if (index >= items.size()) index = items.size() - 1;
+        String next = items.get(index).ref();
+        // 目标项可能在别的页上，页码跟着选中项走。
+        Minecraft.getInstance().gui.setScreen(with(tab, index / rows(), next, false));
     }
 
     private int count(String kind) {
