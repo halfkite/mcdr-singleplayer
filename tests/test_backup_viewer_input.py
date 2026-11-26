@@ -83,3 +83,21 @@ def test_the_shared_painter_is_adapted_for_older_targets():
     block = generator.split("if name in ('RestoreTitleScreenMixin.java'", 1)[1].split('):', 1)[0]
     for name in ('VanillaConfluxUi.java', 'BackupCommentScreen.java', 'ChunkBackupScreen.java'):
         assert name in block, name
+
+
+def test_neoforge_gets_an_entry_and_a_game_directory():
+    """NeoForge 没有 Fabric 的 ScreenEvents / FabricLoader，必须走等价门面。
+
+    NeoScreens 用 ScreenEvent.Init.Post 复刻 AFTER_INIT 并提供可追加的 getWidgets；
+    NeoPlatform.Loader 提供 getGameDir。少了这两处适配，neoforge 变体无法编译。
+    """
+    compat = (ROOT / 'scripts/neoforge_compat.py').read_text(encoding='utf8')
+    # 备份入口要换成 NeoScreens 绑定。
+    assert "elif name == 'BackupViewerButton.java':" in compat
+    # 离线流程要拿到游戏目录。
+    assert "elif name == 'BackupCatalogClient.java':" in compat
+    assert "text.replace('FabricLoader', 'NeoPlatform.Loader')" in compat
+    # NeoScreens 必须真的提供 AFTER_INIT 与 getWidgets。
+    assert 'InitRegistry AFTER_INIT' in compat
+    assert 'static List<AbstractWidget> getWidgets(Screen screen)' in compat
+

@@ -62,6 +62,13 @@ import org.slf4j.Logger;''')
     elif name == 'ConfluxNativeCacheMixin.java':
         text = text.replace('FabricLoader.getInstance().getGameDir()',
                             'net.neoforged.fml.loading.FMLPaths.GAMEDIR.get()')
+    elif name == 'BackupViewerButton.java':
+        # 备份入口挂在存档编辑界面上：NeoScreens 用 ScreenEvent.Init.Post 复刻了
+        # Fabric 的 AFTER_INIT，getWidgets 也提供同样的可追加列表，所以只换名字即可。
+        text = _bind_screens(text, fully_qualified_import=True)
+    elif name == 'BackupCatalogClient.java':
+        # 离线流程要找到游戏目录去拼 runtime 路径；Loader 的门面在 NeoForge 侧同名。
+        text = text.replace('FabricLoader', 'NeoPlatform.Loader')
     elif name == 'RestoreRecoveryClient.java':
         text = text.replace('FabricLoader.getInstance().getGameDir()',
                             'net.neoforged.fml.loading.FMLPaths.GAMEDIR.get()')
